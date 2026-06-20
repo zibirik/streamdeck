@@ -10,10 +10,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -32,6 +36,7 @@ class ObsViewModel @Inject constructor(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ObsUiState())
     val uiState: StateFlow<ObsUiState> = _uiState.asStateFlow()
+    private var statusPollingJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -56,13 +61,32 @@ class ObsViewModel @Inject constructor(
         persist()
     }
 
+    fun startStatusPolling() {
+        statusPollingJob?.cancel()
+        statusPollingJob = viewModelScope.launch {
+            while (isActive) {
+                delay(2_500)
+                if (_uiState.value.working) continue
+                runCatching {
+                    loadStatuses()
+                    loadStudioMode()
+                }
+            }
+        }
+    }
+
+    fun stopStatusPolling() {
+        statusPollingJob?.cancel()
+        statusPollingJob = null
+    }
+
     fun refreshAll() = viewModelScope.launch {
         _uiState.update { it.copy(working = true, message = "Connecting…") }
         runCatching {
             loadStudioMode()
             loadScenes()
             loadInputs()
-            loadStatuses()
+            refreshOutputStatuses()
             loadStats()
             loadStreamServiceSettings()
             patch { copy(message = "Connected") }
@@ -76,18 +100,18 @@ class ObsViewModel @Inject constructor(
         loadScenes()
     }
 
-    fun toggleStream() = runCommand("ToggleStream") { loadStatuses() }
+    fun toggleStream() = runCommand("ToggleStream") { refreshOutputStatuses() }
     fun startStream() = runCommand("StartStream") {
-        loadStatuses()
+        refreshOutputStatuses()
         loadStreamServiceSettings()
     }
-    fun stopStream() = runCommand("StopStream") { loadStatuses() }
-    fun toggleRecord() = runCommand("ToggleRecord") { loadStatuses() }
-    fun startRecord() = runCommand("StartRecord") { loadStatuses() }
-    fun stopRecord() = runCommand("StopRecord") { loadStatuses() }
+    fun stopStream() = runCommand("StopStream") { refreshOutputStatuses() }
+    fun toggleRecord() = runCommand("ToggleRecord") { refreshOutputStatuses() }
+    fun startRecord() = runCommand("StartRecord") { refreshOutputStatuses() }
+    fun stopRecord() = runCommand("StopRecord") { refreshOutputStatuses() }
     fun pauseRecord() {
         val command = if (_uiState.value.recordingPaused) "ResumeRecord" else "PauseRecord"
-        runCommand(command) { loadStatuses() }
+        runCommand(command) { refreshOutputStatuses() }
     }
     fun toggleReplayBuffer() = runCommand("ToggleReplayBuffer")
     fun saveReplayBuffer() = runCommand("SaveReplayBuffer")
@@ -173,18 +197,32 @@ class ObsViewModel @Inject constructor(
         return response["responseData"]?.jsonObject?.get("inputMuted")?.jsonPrimitive?.booleanOrNull ?: false
     }
 
+    private suspend fun refreshOutputStatuses() {
+        loadStatuses()
+        delay(400)
+        loadStatuses()
+    }
+
     private suspend fun loadStatuses() {
         val state = _uiState.value
         val stream = obsWebSocketClient.request(state.url, state.password, "GetStreamStatus")
         val recording = obsWebSocketClient.request(state.url, state.password, "GetRecordStatus")
         val streamData = stream["responseData"]?.jsonObject
         val recordData = recording["responseData"]?.jsonObject
-        val streaming = streamData?.get("outputActive")?.jsonPrimitive?.booleanOrNull ?: false
-        val rec = recordData?.get("outputActive")?.jsonPrimitive?.booleanOrNull ?: false
-        val paused = recordData?.get("outputPaused")?.jsonPrimitive?.booleanOrNull ?: false
+        val streaming = streamData.readBool("outputActive")
+        val rec = recordData.readBool("outputActive")
+        val paused = recordData.readBool("outputPaused")
         val timecode = streamData?.get("outputTimecode")?.jsonPrimitive?.contentOrNull
         val recordTimecode = recordData?.get("outputTimecode")?.jsonPrimitive?.contentOrNull
-        patch { copy(streaming = streaming, recording = rec, recordingPaused = paused, streamTimecode = timecode, recordTimecode = recordTimecode) }
+        patch {
+            copy(
+                streaming = streaming,
+                recording = rec,
+                recordingPaused = paused && rec,
+                streamTimecode = timecode,
+                recordTimecode = recordTimecode,
+            )
+        }
     }
 
     private suspend fun loadStats() {
@@ -239,9 +277,9 @@ class ObsViewModel @Inject constructor(
                     buildJsonObject {
                         put("sourceName", sceneName)
                         put("imageFormat", "jpg")
-                        put("imageWidth", 420)
-                        put("imageHeight", 236)
-                        put("imageCompressionQuality", 65)
+                        put("imageWidth", 640)
+                        put("imageHeight", 360)
+                        put("imageCompressionQuality", 72)
                     },
                 )["responseData"]?.jsonObject?.get("imageData")?.jsonPrimitive?.contentOrNull
             }.getOrNull()
@@ -271,6 +309,16 @@ class ObsViewModel @Inject constructor(
     private fun patch(block: ObsUiState.() -> ObsUiState) {
         _uiState.update(block)
     }
+}
+
+private fun JsonObject?.readBool(key: String): Boolean {
+    val primitive = this?.get(key)?.jsonPrimitive ?: return false
+    return primitive.booleanOrNull
+        ?: when (primitive.contentOrNull?.lowercase()) {
+            "true", "1" -> true
+            "false", "0" -> false
+            else -> primitive.intOrNull == 1
+        }
 }
 
 data class ObsInputUi(
