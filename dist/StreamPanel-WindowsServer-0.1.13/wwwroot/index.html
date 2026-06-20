@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StreamPanel PC Configurator</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, Segoe UI, system-ui, sans-serif; }
+    body { margin: 0; background: radial-gradient(circle at top right,#2e1065 0,#0a0a12 34%,#050508 100%); color: #f3f3fc; }
+    main { max-width: 1160px; margin: 0 auto; padding: 42px 20px; }
+    h1 { margin: 0; font-size: clamp(34px,5vw,58px); letter-spacing: -0.04em; background: linear-gradient(90deg,#a78bfa,#5eead4); -webkit-background-clip: text; color: transparent; }
+    h2 { margin: 0 0 10px; }
+    p { color: #c8c8e0; line-height: 1.55; }
+    .hero { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 18px; align-items: stretch; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 16px; margin-top: 18px; }
+    .card { background: rgba(20,20,34,.76); border: 1px solid rgba(167,139,250,.22); border-radius: 22px; padding: 22px; box-shadow: 0 20px 80px rgba(0,0,0,.28); backdrop-filter: blur(18px); }
+    .pill { display: inline-flex; gap: 8px; align-items: center; margin: 6px 6px 0 0; padding: 8px 10px; border: 1px solid #2a2a3e; border-radius: 999px; background: #11111d; color: #e9e9ff; font-size: 13px; }
+    .ok { color: #5eead4; }
+    .warn { color: #fbbf24; }
+    a { color: #a78bfa; }
+    code, pre { background: #11111d; border: 1px solid #2a2a3e; border-radius: 12px; }
+    code { padding: 2px 6px; }
+    pre { padding: 14px; overflow: auto; color: #d8d8f0; }
+    button { background: linear-gradient(90deg,#8b5cf6,#22d3ee); color: white; border: 0; border-radius: 14px; padding: 11px 14px; font-weight: 700; cursor: pointer; }
+    @media (max-width: 760px) { .hero { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="card">
+        <h1>StreamPanel PC Configurator</h1>
+        <p>База для настройки дека с ПК: статус сервера, диски, игровые данные, ссылки для телефона и будущий редактор кнопок. Открывайте эту страницу на компьютере, где запущен сервер.</p>
+        <button onclick="refreshStatus()">Refresh status</button>
+        <span class="pill">WebSocket: <code id="wsUrl">ws://&lt;pc-ip&gt;:17820/ws</code></span>
+      </div>
+      <div class="card">
+        <h2>Server health</h2>
+        <div id="summary">Loading...</div>
+      </div>
+    </section>
+    <div class="grid">
+      <div class="card">
+        <h2>Storage</h2>
+        <div id="drives">Loading...</div>
+      </div>
+      <div class="card">
+        <h2>Game telemetry</h2>
+        <div id="game">Loading...</div>
+      </div>
+      <div class="card">
+        <h2>Stream chat setup</h2>
+        <p>В приложении укажите Twitch channel или YouTube live video ID. После этого панель Stream Chat сможет показывать чат внутри дека.</p>
+        <p>Twitch пример: <code>your_channel</code><br/>YouTube пример: <code>jfKfPfyJRdk</code></p>
+      </div>
+      <div class="card">
+        <h2>CS2 Game State Integration</h2>
+        <p>Чтобы получить HP, броню, карту, фазу и счёт, добавьте GSI config в папку CS2 config и отправляйте данные на сервер:</p>
+        <pre>"uri" "http://127.0.0.1:17820/integrations/cs2/gsi"</pre>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Developer links</h2>
+      <ul>
+        <li><a href="/status" target="_blank">JSON status API</a></li>
+        <li><a href="/integrations/cs2/gsi" target="_blank">CS2 GSI endpoint</a> accepts POST JSON from the game</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>Next infrastructure step</h2>
+      <p>Следующий слой — полноценный visual deck editor: импорт/экспорт дека, редактирование кнопок мышью, пресеты профилей и синхронизация с телефоном.</p>
+      <p>Place plugins in <code>plugins/</code> folder next to the server executable. See <code>docs/plugin-sdk.md</code>.</p>
+    </div>
+  </main>
+  <script>
+    const fmt = value => value === null || value === undefined || value === '' ? '—' : value;
+    function pill(label, value, cls = '') {
+      return `<span class="pill ${cls}">${label}: <strong>${fmt(value)}</strong></span>`;
+    }
+    function renderDrives(drives) {
+      if (!drives || drives.length === 0) return '<p>No ready drives reported.</p>';
+      return drives.map(d => {
+        const used = Math.max(0, Math.min(100, 100 - d.freePercent));
+        return `<p><strong>${d.name}${d.label ? ' · ' + d.label : ''}</strong><br/>
+          ${d.freeGb} GB free of ${d.totalGb} GB
+          <br/><progress max="100" value="${used}"></progress></p>`;
+      }).join('');
+    }
+    function renderGame(game) {
+      if (!game || !game.detected) return '<p class="warn">Supported game not detected yet.</p>';
+      return [
+        pill('Provider', game.provider, 'ok'),
+        pill('Map', game.mapName),
+        pill('Phase', game.phase),
+        pill('HP', game.health),
+        pill('Armor', game.armor),
+        pill('Ammo', [game.ammoClip, game.ammoReserve].filter(v => v !== null && v !== undefined).join('/')),
+        game.note ? `<p>${game.note}</p>` : ''
+      ].join('');
+    }
+    function refreshStatus() {
+      fetch('/status').then(r => r.json()).then(data => {
+        const host = location.host;
+        document.getElementById('wsUrl').textContent = `ws://${host}/ws`;
+        document.getElementById('summary').innerHTML = [
+          pill('Machine', data.machineName, 'ok'),
+          pill('Clients', data.activeClients),
+          pill('CPU', data.cpuPercent ? data.cpuPercent + '%' : null),
+          pill('RAM', data.ramPercent ? data.ramPercent + '%' : null),
+          pill('Foreground', data.foregroundProcess)
+        ].join('');
+        document.getElementById('drives').innerHTML = renderDrives(data.storageDrives);
+        document.getElementById('game').innerHTML = renderGame(data.gameInfo);
+      }).catch(e => {
+        document.getElementById('summary').textContent = 'Failed: ' + e;
+      });
+    }
+    refreshStatus();
+  </script>
+</body>
+</html>

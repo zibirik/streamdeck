@@ -1,0 +1,43 @@
+# Android / Gradle
+.gradle/
+build/
+**/build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# Kotlin
+*.kotlin_module
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.rsuser
+
+# Build artifacts / release bundles
+dist/
+build-check/
+
+# Logs and local runtime files
+*.log
+*.tmp
+*.temp
+
+# Secrets
+.env
+*.env
+secrets.properties
+credentials.json
+*.keystore
+*.jks
+
+# OS
+Thumbs.db
+Desktop.ini
