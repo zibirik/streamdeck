@@ -54,7 +54,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.style.TextOverflow
+import com.streampanel.core.designsystem.WindowWidthSizeClass
+import com.streampanel.core.designsystem.toWidthSizeClass
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,6 +82,10 @@ fun ObsRoute(
     viewModel: ObsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    DisposableEffect(Unit) {
+        viewModel.startStatusPolling()
+        onDispose { viewModel.stopStatusPolling() }
+    }
     ObsScreen(
         state = state,
         onBack = onBack,
@@ -123,6 +135,13 @@ fun ObsScreen(
     onToggleInputMute: (String) -> Unit,
 ) {
     val s = strings()
+    val configuration = LocalConfiguration.current
+    val widthClass = configuration.screenWidthDp.dp.toWidthSizeClass()
+    val contentPadding = when (widthClass) {
+        WindowWidthSizeClass.Compact -> 12.dp
+        WindowWidthSizeClass.Medium -> 18.dp
+        WindowWidthSizeClass.Expanded -> 24.dp
+    }
     AppBackdrop {
         Scaffold(
             containerColor = Color.Transparent,
@@ -151,11 +170,12 @@ fun ObsScreen(
                     .padding(padding)
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
+                    .padding(contentPadding),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 ObsHeroSection(
                     state = state,
+                    widthClass = widthClass,
                     onToggleStream = onToggleStream,
                     onStartStream = onStartStream,
                     onStopStream = onStopStream,
@@ -173,6 +193,7 @@ fun ObsScreen(
                 if (state.scenes.isNotEmpty()) {
                     ObsScenesSection(
                         state = state,
+                        widthClass = widthClass,
                         onSwitchScene = onSwitchScene,
                         onPreviewScene = onPreviewScene,
                     )
@@ -197,6 +218,7 @@ fun ObsScreen(
 @Composable
 private fun ObsHeroSection(
     state: ObsUiState,
+    widthClass: WindowWidthSizeClass,
     onToggleStream: () -> Unit,
     onStartStream: () -> Unit,
     onStopStream: () -> Unit,
@@ -212,49 +234,110 @@ private fun ObsHeroSection(
 ) {
     val programScene = state.sceneByName(state.currentScene)
     val previewScene = state.sceneByName(state.currentPreviewScene)
+    val sectionPadding = when (widthClass) {
+        WindowWidthSizeClass.Compact -> 14.dp
+        WindowWidthSizeClass.Medium -> 18.dp
+        WindowWidthSizeClass.Expanded -> 20.dp
+    }
     GlassSurface(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.padding(sectionPadding), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("OBS Studio Control Room", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "OBS Studio Control Room",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
                     Text(state.message, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
-                StatusBadge(if (state.streaming) "LIVE" else "OFF AIR", if (state.streaming) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surfaceVariant)
-                StatusBadge(recordStatusText(state), if (state.recordingPaused) MaterialTheme.colorScheme.tertiary else if (state.recording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surfaceVariant)
+                StatusBadge(
+                    label = if (state.streaming) "LIVE" else "OFF AIR",
+                    color = if (state.streaming) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surfaceVariant,
+                )
+                StatusBadge(
+                    label = recordStatusText(state),
+                    color = when {
+                        state.recordingPaused -> MaterialTheme.colorScheme.tertiary
+                        state.recording -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    },
+                )
             }
 
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                ObsMonitorPanel(
-                    title = "PROGRAM",
-                    scene = programScene,
-                    fallbackSceneName = state.currentScene ?: "No scene",
-                    accent = if (state.streaming) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.width(430.dp),
-                )
-                ObsMonitorPanel(
-                    title = "PREVIEW",
-                    scene = previewScene,
-                    fallbackSceneName = state.currentPreviewScene ?: "Select scene",
-                    accent = MaterialTheme.colorScheme.tertiary,
-                    dimmed = !state.studioModeEnabled,
-                    modifier = Modifier.width(430.dp),
-                )
-                ObsControlPanel(
-                    state = state,
-                    onToggleStream = onToggleStream,
-                    onStartStream = onStartStream,
-                    onStopStream = onStopStream,
-                    onToggleRecord = onToggleRecord,
-                    onStartRecord = onStartRecord,
-                    onStopRecord = onStopRecord,
-                    onPauseRecord = onPauseRecord,
-                    onToggleReplay = onToggleReplay,
-                    onSaveReplay = onSaveReplay,
-                    onToggleVirtualCam = onToggleVirtualCam,
-                    onToggleStudio = onToggleStudio,
-                    onTransitionStudio = onTransitionStudio,
-                    modifier = Modifier.width(340.dp),
-                )
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val stacked = maxWidth < 720.dp
+                if (stacked) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ObsMonitorPanel(
+                            title = "PROGRAM",
+                            scene = programScene,
+                            fallbackSceneName = state.currentScene ?: "No scene",
+                            accent = if (state.streaming) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        ObsMonitorPanel(
+                            title = "PREVIEW",
+                            scene = previewScene,
+                            fallbackSceneName = state.currentPreviewScene ?: "Select scene",
+                            accent = MaterialTheme.colorScheme.tertiary,
+                            dimmed = !state.studioModeEnabled,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        ObsControlPanel(
+                            state = state,
+                            widthClass = widthClass,
+                            onToggleStream = onToggleStream,
+                            onStartStream = onStartStream,
+                            onStopStream = onStopStream,
+                            onToggleRecord = onToggleRecord,
+                            onStartRecord = onStartRecord,
+                            onStopRecord = onStopRecord,
+                            onPauseRecord = onPauseRecord,
+                            onToggleReplay = onToggleReplay,
+                            onSaveReplay = onSaveReplay,
+                            onToggleVirtualCam = onToggleVirtualCam,
+                            onToggleStudio = onToggleStudio,
+                            onTransitionStudio = onTransitionStudio,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        ObsMonitorPanel(
+                            title = "PROGRAM",
+                            scene = programScene,
+                            fallbackSceneName = state.currentScene ?: "No scene",
+                            accent = if (state.streaming) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        ObsMonitorPanel(
+                            title = "PREVIEW",
+                            scene = previewScene,
+                            fallbackSceneName = state.currentPreviewScene ?: "Select scene",
+                            accent = MaterialTheme.colorScheme.tertiary,
+                            dimmed = !state.studioModeEnabled,
+                            modifier = Modifier.weight(1f),
+                        )
+                        ObsControlPanel(
+                            state = state,
+                            widthClass = widthClass,
+                            onToggleStream = onToggleStream,
+                            onStartStream = onStartStream,
+                            onStopStream = onStopStream,
+                            onToggleRecord = onToggleRecord,
+                            onStartRecord = onStartRecord,
+                            onStopRecord = onStopRecord,
+                            onPauseRecord = onPauseRecord,
+                            onToggleReplay = onToggleReplay,
+                            onSaveReplay = onSaveReplay,
+                            onToggleVirtualCam = onToggleVirtualCam,
+                            onToggleStudio = onToggleStudio,
+                            onTransitionStudio = onTransitionStudio,
+                            modifier = Modifier.width(320.dp),
+                        )
+                    }
+                }
             }
 
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -291,7 +374,13 @@ private fun ObsMonitorPanel(
                 StatusDot(accent.copy(alpha = if (dimmed) 0.35f else 1f))
                 Text(title, color = accent.copy(alpha = if (dimmed) 0.55f else 1f), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
-                Text(scene?.name ?: fallbackSceneName, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                Text(
+                    scene?.name ?: fallbackSceneName,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             Box(
                 modifier = Modifier
@@ -323,6 +412,7 @@ private fun ObsMonitorPanel(
 @Composable
 private fun ObsControlPanel(
     state: ObsUiState,
+    widthClass: WindowWidthSizeClass,
     onToggleStream: () -> Unit,
     onStartStream: () -> Unit,
     onStopStream: () -> Unit,
@@ -344,29 +434,74 @@ private fun ObsControlPanel(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionHeader("Управление", "главные кнопки отдельно")
-            ObsActionButton("Стрим", Icons.Default.LiveTv, state.streaming, onToggleStream, Modifier.fillMaxWidth())
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onStartStream, enabled = !state.working && !state.streaming, modifier = Modifier.weight(1f)) { Text("Start") }
-                OutlinedButton(onClick = onStopStream, enabled = !state.working && state.streaming, modifier = Modifier.weight(1f)) { Text("Stop") }
-            }
-            ObsActionButton(
-                label = if (state.recordingPaused) "Запись на паузе" else "Запись",
-                icon = Icons.Default.FiberManualRecord,
-                active = state.recording,
-                onClick = onToggleRecord,
-                modifier = Modifier.fillMaxWidth(),
-                paused = state.recordingPaused,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onStartRecord, enabled = !state.working && !state.recording, modifier = Modifier.weight(1f)) { Text("Start") }
-                OutlinedButton(onClick = onStopRecord, enabled = !state.working && state.recording, modifier = Modifier.weight(1f)) { Text("Stop") }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onPauseRecord, enabled = !state.working && state.recording, modifier = Modifier.weight(1f)) {
-                    Text(if (state.recordingPaused) "Resume" else "Pause")
+            SectionHeader("Управление", streamStatusHint(state))
+
+            if (state.streaming) {
+                Button(
+                    onClick = onStopStream,
+                    enabled = !state.working,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Icon(Icons.Default.LiveTv, contentDescription = null)
+                    Text(" Остановить трансляцию", maxLines = 1)
                 }
-                OutlinedButton(onClick = onSaveReplay, enabled = !state.working, modifier = Modifier.weight(1f)) { Text("Clip") }
+            } else {
+                Button(
+                    onClick = onStartStream,
+                    enabled = !state.working,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.LiveTv, contentDescription = null)
+                    Text(" Начать трансляцию", maxLines = 1)
+                }
+            }
+            OutlinedButton(onClick = onToggleStream, enabled = !state.working, modifier = Modifier.fillMaxWidth()) {
+                Text("Переключить эфир", color = Color.White)
+            }
+
+            if (state.recording) {
+                val recordLabel = when {
+                    state.recordingPaused -> "Продолжить запись"
+                    else -> "Остановить запись"
+                }
+                val recordAction = if (state.recordingPaused) onPauseRecord else onStopRecord
+                Button(
+                    onClick = recordAction,
+                    enabled = !state.working,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (state.recordingPaused) {
+                            MaterialTheme.colorScheme.tertiary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                    ),
+                ) {
+                    Icon(Icons.Default.FiberManualRecord, contentDescription = null)
+                    Text(" $recordLabel", maxLines = 1)
+                }
+            } else {
+                Button(
+                    onClick = onStartRecord,
+                    enabled = !state.working,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.FiberManualRecord, contentDescription = null)
+                    Text(" Начать запись", maxLines = 1)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = onPauseRecord,
+                    enabled = !state.working && state.recording && !state.recordingPaused,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Pause", maxLines = 1)
+                }
+                OutlinedButton(onClick = onToggleRecord, enabled = !state.working, modifier = Modifier.weight(1f)) {
+                    Text("Toggle", maxLines = 1)
+                }
             }
             Button(
                 onClick = onTransitionStudio,
@@ -377,18 +512,35 @@ private fun ObsControlPanel(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onToggleStudio, enabled = !state.working, modifier = Modifier.weight(1f)) {
-                    Text(if (state.studioModeEnabled) "Studio ON" else "Studio", color = Color.White)
+                    Text(if (state.studioModeEnabled) "Studio ON" else "Studio", color = Color.White, maxLines = 1)
                 }
                 OutlinedButton(onClick = onToggleVirtualCam, enabled = !state.working, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Videocam, null, tint = Color.White)
-                    Text(" Cam", color = Color.White)
+                    Text(" Cam", color = Color.White, maxLines = 1)
                 }
             }
-            OutlinedButton(onClick = onToggleReplay, enabled = !state.working, modifier = Modifier.fillMaxWidth()) {
-                Text("Replay buffer", color = Color.White)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onToggleReplay, enabled = !state.working, modifier = Modifier.weight(1f)) {
+                    Text("Replay", color = Color.White, maxLines = 1)
+                }
+                OutlinedButton(onClick = onSaveReplay, enabled = !state.working, modifier = Modifier.weight(1f)) {
+                    Text("Clip", maxLines = 1)
+                }
             }
         }
     }
+}
+
+private fun streamStatusHint(state: ObsUiState): String = buildString {
+    append(if (state.streaming) "Эфир идёт" else "Эфир выключен")
+    append(" · ")
+    append(
+        when {
+            state.recordingPaused -> "Запись на паузе"
+            state.recording -> "Идёт запись"
+            else -> "Запись выключена"
+        },
+    )
 }
 
 @Composable
@@ -418,10 +570,21 @@ private fun StatusDot(color: Color) {
 @Composable
 private fun ObsScenesSection(
     state: ObsUiState,
+    widthClass: WindowWidthSizeClass,
     onSwitchScene: (String) -> Unit,
     onPreviewScene: (String) -> Unit,
 ) {
     val s = strings()
+    val cardWidth = when (widthClass) {
+        WindowWidthSizeClass.Compact -> 168.dp
+        WindowWidthSizeClass.Medium -> 196.dp
+        WindowWidthSizeClass.Expanded -> 220.dp
+    }
+    val previewHeight = when (widthClass) {
+        WindowWidthSizeClass.Compact -> 96.dp
+        WindowWidthSizeClass.Medium -> 112.dp
+        WindowWidthSizeClass.Expanded -> 128.dp
+    }
     GlassSurface(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(s.obsScenes, if (state.studioModeEnabled) "Нажатие выбирает Preview" else "Нажатие сразу выводит в эфир")
@@ -432,6 +595,8 @@ private fun ObsScenesSection(
                         live = scene.name == state.currentScene,
                         preview = scene.name == state.currentPreviewScene,
                         studioMode = state.studioModeEnabled,
+                        cardWidth = cardWidth,
+                        previewHeight = previewHeight,
                         onClick = {
                             if (state.studioModeEnabled) {
                                 onPreviewScene(scene.name)
@@ -541,13 +706,15 @@ private fun ObsSceneCard(
     live: Boolean,
     preview: Boolean,
     studioMode: Boolean,
+    cardWidth: Dp,
+    previewHeight: Dp,
     onClick: () -> Unit,
 ) {
     val bitmap = remember(scene.previewImageData) { decodeObsImageData(scene.previewImageData) }
     val shape = RoundedCornerShape(18.dp)
     Surface(
         modifier = Modifier
-            .width(196.dp)
+            .width(cardWidth)
             .clip(shape)
             .clickable(onClick = onClick),
         shape = shape,
@@ -561,7 +728,8 @@ private fun ObsSceneCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(108.dp)
+                    .height(previewHeight)
+                    .aspectRatio(16f / 9f)
                     .clip(RoundedCornerShape(14.dp))
                     .background(Color.Black.copy(alpha = 0.26f)),
             ) {
@@ -646,29 +814,4 @@ private fun decodeObsImageData(value: String?): ImageBitmap? {
         val bytes = Base64.decode(base64, Base64.DEFAULT)
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
     }.getOrNull()
-}
-
-@Composable
-private fun ObsActionButton(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    active: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    paused: Boolean = false,
-) {
-    Button(
-        onClick = onClick,
-        modifier = modifier,
-        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-            containerColor = when {
-                paused -> MaterialTheme.colorScheme.tertiary
-                active -> MaterialTheme.colorScheme.error
-                else -> MaterialTheme.colorScheme.primary
-            },
-        ),
-    ) {
-        Icon(icon, contentDescription = null)
-        Text(" $label", maxLines = 1)
-    }
 }

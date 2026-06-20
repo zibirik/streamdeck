@@ -16,7 +16,7 @@ Stream · Work · Study · Gaming · Automation · Smart Home — all from one g
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.x-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![.NET](https://img.shields.io/badge/.NET%208-Windows%20Server-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![Version](https://img.shields.io/badge/version-0.1.14-8b5cf6?style=for-the-badge)](android/app/build.gradle.kts)
+[![Version](https://img.shields.io/badge/version-0.1.15-8b5cf6?style=for-the-badge)](android/app/build.gradle.kts)
 [![License](https://img.shields.io/badge/license-TBD-slate?style=for-the-badge)](#license)
 
 [Quick Start](#-quick-start) · [Features](#-features) · [Screenshots](#-screenshots) · [Architecture](#-architecture) · [Docs](#-documentation) · [Русский](README.ru.md)
