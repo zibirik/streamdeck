@@ -4,7 +4,7 @@ namespace StreamPanel.Server.Infrastructure;
 
 public static class TrayHost
 {
-    public static void StartIfEnabled(IConfiguration configuration, int port)
+    public static void StartIfEnabled(IConfiguration configuration, int port, PinBootstrapResult pin)
     {
         if (!configuration.GetValue("StreamPanel:TrayIcon", true)) return;
 
@@ -23,6 +23,16 @@ public static class TrayHost
                 icon.ContextMenuStrip.Items.Add("Open status", null, (_, _) =>
                 {
                     Process.Start(new ProcessStartInfo($"http://localhost:{port}/status") { UseShellExecute = true });
+                });
+                if (pin.Pin is not null)
+                {
+                    icon.ContextMenuStrip.Items.Add("Show PIN", null, (_, _) =>
+                        System.Windows.Forms.MessageBox.Show($"PIN for the tablet: {pin.Pin}", "StreamPanel"));
+                }
+                icon.ContextMenuStrip.Items.Add("Open settings folder", null, (_, _) =>
+                {
+                    System.IO.Directory.CreateDirectory(UserData.Directory);
+                    Process.Start(new ProcessStartInfo(UserData.Directory) { UseShellExecute = true });
                 });
                 icon.ContextMenuStrip.Items.Add("Exit", null, (_, _) => Environment.Exit(0));
                 System.Windows.Forms.Application.Run();

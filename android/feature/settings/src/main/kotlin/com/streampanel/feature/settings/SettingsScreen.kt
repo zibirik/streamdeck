@@ -417,4 +417,8 @@ private fun messageText(message: SettingsMessage, t: Txt): String = when (messag
     SettingsMessageKind.NothingToExport -> t.t("Пока нечего сохранять", "Nothing to save yet")
     SettingsMessageKind.NoTimeEntries -> t.t("Пока нет записей времени", "No time entries yet")
     SettingsMessageKind.TimeCsvReady -> t.t("Таблица готова — скопируйте её", "Table is ready — copy it")
+    SettingsMessageKind.Cs2Installed -> t.t("Готово! Перезапустите Counter-Strike 2 один раз", "Done! Restart Counter-Strike 2 once")
+    SettingsMessageKind.Cs2NotFound -> t.t("Counter-Strike 2 не найден на ПК", "Counter-Strike 2 was not found on the PC")
+    SettingsMessageKind.Cs2WrongPin -> t.t("Неверный PIN — проверьте раздел «Мой ПК»", "Wrong PIN — check the My PC page")
+    SettingsMessageKind.Cs2Failed -> t.t("Не получилось установить интеграцию", "Could not install the integration")
 }

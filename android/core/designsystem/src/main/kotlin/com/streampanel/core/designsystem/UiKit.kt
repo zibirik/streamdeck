@@ -632,10 +632,20 @@ fun TileGrid(tiles: List<TileSpec>, modifier: Modifier = Modifier, columns: Int 
 
 /** A labeled bar that turns red when the value gets high. */
 @Composable
-fun StatMeter(label: String, percent: Float?, modifier: Modifier = Modifier, accent: Color = MaterialTheme.colorScheme.primary) {
+fun StatMeter(
+    label: String,
+    percent: Float?,
+    modifier: Modifier = Modifier,
+    accent: Color = MaterialTheme.colorScheme.primary,
+    /** For things where low is bad (health): the bar warns when it runs low instead of when it runs high. */
+    lowIsBad: Boolean = false,
+) {
     val value = percent?.coerceIn(0f, 100f) ?: 0f
     val animated by animateFloatAsState(value / 100f, label = "meter")
     val color = when {
+        lowIsBad && value <= 25f -> UiPalette.Red
+        lowIsBad && value <= 50f -> UiPalette.Amber
+        lowIsBad -> accent
         value >= 90f -> UiPalette.Red
         value >= 75f -> UiPalette.Amber
         else -> accent

@@ -13,6 +13,7 @@ import com.streampanel.core.model.ControlPage
 import com.streampanel.core.model.ControlProfile
 import com.streampanel.core.model.DashboardButton
 import com.streampanel.core.model.DashboardLayoutSettings
+import com.streampanel.core.model.Cs2IntegrationInfo
 import com.streampanel.core.model.GameOverlaySettings
 import com.streampanel.core.model.GameTelemetryInfo
 import com.streampanel.core.model.GridLayout
@@ -27,6 +28,7 @@ import com.streampanel.core.model.QuickOpenUrlGroup
 import com.streampanel.core.model.ServerConnectionSettings
 import com.streampanel.core.model.StreamChatSettings
 import com.streampanel.core.network.ConnectionStatus
+import com.streampanel.core.network.Cs2InstallOutcome
 import com.streampanel.core.network.PcConnectionClient
 import com.streampanel.core.network.PcConnectionManager
 import com.streampanel.core.network.PcServerStatus
@@ -85,6 +87,8 @@ class DashboardViewModel @Inject constructor(
     private val timeTrackerStartedAt = MutableStateFlow<Long?>(null)
     private val showLayerGridDialog = MutableStateFlow(false)
     private val buttonActionDialog = MutableStateFlow<DashboardButton?>(null)
+    private val commandOutput = MutableStateFlow<CommandOutput?>(null)
+    private val cs2Integration = MutableStateFlow(Cs2IntegrationInfo())
 
     private val profile = repository.observeActiveProfile()
     private val pages = profile.flatMapLatest { prof ->
@@ -134,9 +138,9 @@ class DashboardViewModel @Inject constructor(
         combine(volumeDraft, showSleepConfirm, showLayerGridDialog) { volume, sleep, layer ->
             Triple(volume, sleep, layer)
         },
-        buttonActionDialog,
-    ) { (status, executing, message), (volume, sleepConfirm, layerGrid), actionDialog ->
-        RuntimeSnapshot(status, executing, message, volume, sleepConfirm, layerGrid, actionDialog)
+        combine(buttonActionDialog, commandOutput, cs2Integration) { dialog, output, cs2 -> Triple(dialog, output, cs2) },
+    ) { (status, executing, message), (volume, sleepConfirm, layerGrid), (actionDialog, output, cs2) ->
+        RuntimeSnapshot(status, executing, message, volume, sleepConfirm, layerGrid, actionDialog, output, cs2)
     }
 
     private val extendedState = combine(
@@ -189,6 +193,8 @@ class DashboardViewModel @Inject constructor(
             showSleepConfirm = runtime.sleepConfirm,
             showLayerGridDialog = runtime.layerGridDialog,
             buttonActionDialog = runtime.actionDialog,
+            commandOutput = runtime.output,
+            cs2Integration = runtime.cs2,
             isMuted = audio.muted,
             isMicMuted = audio.micMuted,
             isPlaying = audio.playing,
@@ -272,7 +278,7 @@ class DashboardViewModel @Inject constructor(
                         refreshPcStatus()
                     }
                 }
-                delay(5_000)
+                delay(2_000)
             }
         }
     }
@@ -487,6 +493,7 @@ class DashboardViewModel @Inject constructor(
                 topProcesses.value = status.topProcesses
                 val overlaySettings = preferencesDataSource.gameOverlaySettings.first()
                 gameInfo.value = resolveGameInfo(status, overlaySettings)
+                cs2Integration.value = status.cs2.copy(probed = true)
                 applyFocusTracking(status.foregroundProcess)
             } ?: run {
                 val report = executePc(ActionType.VolumeCommand, mapOf("action" to "get"))
@@ -564,17 +571,48 @@ class DashboardViewModel @Inject constructor(
     fun discordDeafen() = systemAction("discord_deafen", "Discord deafen")
     fun discordPushToTalk() = systemAction("discord_ptt", "Discord PTT")
 
-    fun gitPull() = systemAction("git_pull", "Git pull sent")
-    fun gitStatus() = systemAction("git_status", "Git status sent")
-    fun dockerPs() = systemAction("docker_ps", "Docker ps sent")
-    fun dockerUp() = systemAction("docker_compose_up", "Docker compose up sent")
+    fun gitPull() = systemActionWithOutput("git_pull", "git pull")
+    fun gitStatus() = systemActionWithOutput("git_status", "git status")
+    fun dockerPs() = systemActionWithOutput("docker_ps", "docker ps")
+    fun dockerUp() = systemActionWithOutput("docker_compose_up", "docker compose up")
     fun vscodeRunTests() = sendHotkey("CTRL+SHIFT+T", "Run tests")
     fun vscodeFormat() = sendHotkey("SHIFT+ALT+F", "Format document")
     fun vscodeTerminal() = sendHotkey("CTRL+`", "Terminal toggled")
-    fun restartWifi() = systemAction("wifi_restart", "Wi-Fi restarted")
-    fun flushDns() = systemAction("flush_dns", "DNS cache flushed")
-    fun emptyRecycleBin() = systemAction("empty_recycle_bin", "Recycle bin emptied")
+    fun restartWifi() = systemActionWithOutput("wifi_restart", "Wi-Fi restart")
+    fun flushDns() = systemActionWithOutput("flush_dns", "DNS cache flush")
+    fun emptyRecycleBin() = systemActionWithOutput("empty_recycle_bin", "Recycle bin")
 
+    /**
+     * Runs a program on the PC and shows what it printed. "Sent" is not an answer: the person wants to see
+     * the result of `git status`, or why `git pull` failed.
+     */
+    private fun systemActionWithOutput(name: String, title: String) {
+        viewModelScope.launch {
+            lastMessage.value = "$title…"
+            val report = executePc(ActionType.SystemCommand, mapOf("name" to name))
+            lastMessage.value = null
+            commandOutput.value = CommandOutput(title = title, text = report.message, ok = report.ok)
+        }
+    }
+
+    fun dismissCommandOutput() {
+        commandOutput.value = null
+    }
+
+    /** Asks the PC to put the Counter-Strike config file where the game reads it (no copying by hand). */
+    fun installCs2Integration() {
+        viewModelScope.launch {
+            val settings = preferencesDataSource.serverConnection.first()
+            lastMessage.value = "Setting up Counter-Strike…"
+            lastMessage.value = when (val outcome = pcStatusClient.installCs2(settings.host, settings.port, settings.pin)) {
+                Cs2InstallOutcome.Installed -> "Counter-Strike integration installed — restart the game once"
+                Cs2InstallOutcome.GameNotFound -> "Counter-Strike 2 was not found on the PC"
+                Cs2InstallOutcome.WrongPin -> "Wrong PIN — check Settings → My PC"
+                is Cs2InstallOutcome.Failed -> "Could not set up Counter-Strike: ${outcome.reason}"
+            }
+            refreshPcStatus()
+        }
+    }
     fun toggleMicMute() = volumeAction("mic_mute_toggle", "Microphone toggled")
 
     fun switchToSpeakers() = volumeAction("switch_output", "Speakers", mapOf("device" to "speakers"))
@@ -773,6 +811,8 @@ private data class RuntimeSnapshot(
     val sleepConfirm: Boolean,
     val layerGridDialog: Boolean,
     val actionDialog: DashboardButton?,
+    val output: CommandOutput?,
+    val cs2: Cs2IntegrationInfo,
 )
 
 private data class AudioSnapshot(
@@ -810,6 +850,8 @@ data class DashboardUiState(
     val showSleepConfirm: Boolean = false,
     val showLayerGridDialog: Boolean = false,
     val buttonActionDialog: DashboardButton? = null,
+    val commandOutput: CommandOutput? = null,
+    val cs2Integration: Cs2IntegrationInfo = Cs2IntegrationInfo(),
     val isMuted: Boolean = false,
     val isMicMuted: Boolean = false,
     val isPlaying: Boolean = false,
@@ -860,3 +902,6 @@ private data class ExtendedSnapshot(
     val tracker: TimeTrackerSnapshot,
     val game: GameTelemetryInfo,
 )
+
+/** The answer of a program the PC ran for a button: what to show in the "Result" window. */
+data class CommandOutput(val title: String, val text: String, val ok: Boolean)

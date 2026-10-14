@@ -15,6 +15,7 @@ public class RequestPinMiddlewareTests
     [InlineData("/status")]
     [InlineData("/api/configurator/draft")]
     [InlineData("/integrations/cs2/config")]
+    [InlineData("/gsi")]
     [InlineData("/STATUS")]
     public async Task RemoteWithoutPin_IsRejected(string path)
     {
@@ -92,12 +93,31 @@ public class RequestPinMiddlewareTests
         Assert.True(result.ReachedEndpoint);
     }
 
+    [Theory]
+    [InlineData("/gsi")]
+    [InlineData("/integrations/cs2/gsi")]
+    public async Task CounterStrikePost_DoesNotNeedAPin(string path)
+    {
+        var result = await Send("1234", path, remote: Remote, method: "POST");
+
+        Assert.True(result.ReachedEndpoint);
+    }
+
+    [Fact]
+    public async Task CounterStrikeGet_StillNeedsAPinFromTheLan()
+    {
+        var result = await Send("1234", "/integrations/cs2/gsi", remote: Remote, method: "GET");
+
+        Assert.Equal(StatusCodes.Status401Unauthorized, result.Status);
+        Assert.False(result.ReachedEndpoint);
+    }
+
     private static Task<(int Status, bool ReachedEndpoint)> Send(
-        string pin, string path, IPAddress remote, string? header = null, string query = "") =>
-        Send(BuildServices(pin), path, remote, header, query);
+        string pin, string path, IPAddress remote, string? header = null, string query = "", string method = "GET") =>
+        Send(BuildServices(pin), path, remote, header, query, method);
 
     private static async Task<(int Status, bool ReachedEndpoint)> Send(
-        IServiceProvider services, string path, IPAddress remote, string? header = null, string query = "")
+        IServiceProvider services, string path, IPAddress remote, string? header = null, string query = "", string method = "GET")
     {
         var reached = false;
         var pipeline = new ApplicationBuilder(services);
@@ -109,6 +129,7 @@ public class RequestPinMiddlewareTests
         });
 
         var context = new DefaultHttpContext { RequestServices = services };
+        context.Request.Method = method;
         context.Request.Path = path;
         context.Request.QueryString = new QueryString(query);
         context.Connection.RemoteIpAddress = remote;

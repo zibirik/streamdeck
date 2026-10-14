@@ -270,6 +270,26 @@ data class GameTelemetryInfo(
     val enemyScore: Int? = null,
     val pingMs: Int? = null,
     val note: String? = null,
+    val weapon: String? = null,
+    val money: Int? = null,
+    val kills: Int? = null,
+    val deaths: Int? = null,
+    val assists: Int? = null,
+    val mvps: Int? = null,
+    val round: Int? = null,
+    val bomb: String? = null,
+    val activity: String? = null,
+)
+
+/** Is the PC set up to receive Counter-Strike data, and is the game sending it right now? */
+@Serializable
+data class Cs2IntegrationInfo(
+    val found: Boolean = false,
+    val installed: Boolean = false,
+    val live: Boolean = false,
+    val receivedPayloads: Int = 0,
+    /** True after a successful `/status` reply from the PC. Until then "not found" would be a lie. */
+    val probed: Boolean = false,
 )
 
 @Serializable

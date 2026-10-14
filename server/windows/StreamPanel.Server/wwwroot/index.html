@@ -252,15 +252,17 @@
       <div class="grid">
         <div class="card span-6">
           <h2>CS2 Game State Integration</h2>
-          <p>Оверлей не сможет показать HP/карту/патроны, пока CS2 не отправляет данные на сервер. Скачай config и положи его в папку CS2 config.</p>
+          <p>Один клик: сервер сам найдёт Counter-Strike 2 на этом ПК и положит нужный файл. Копировать вручную не нужно.</p>
           <div class="actions">
-            <a class="button" href="/integrations/cs2/download-config">Скачать GSI config</a>
+            <button type="button" onclick="installCs2()">Установить на этот ПК</button>
+            <a class="button secondary" href="/integrations/cs2/download-config">Скачать GSI config</a>
             <button class="secondary" onclick="copyCs2Config()">Скопировать config</button>
             <a class="button secondary" href="/integrations/cs2/status" target="_blank">GSI status JSON</a>
           </div>
-          <label>Куда положить файл</label>
+          <p id="cs2InstallResult" class="small"></p>
+          <label>Если ставите вручную, файл должен лежать здесь</label>
           <pre>...\Steam\steamapps\common\Counter-Strike Global Offensive\game\csgo\cfg\gamestate_integration_streampanel.cfg</pre>
-          <p class="small">После копирования файла перезапусти CS2. Затем открой матч/тренировку, и счётчик пакетов ниже должен стать больше 0.</p>
+          <p class="small">После установки перезапустите CS2. Затем откройте матч или тренировку — счётчик пакетов ниже должен стать больше 0.</p>
         </div>
         <div class="card span-6">
           <h2>GSI диагностика</h2>
@@ -464,6 +466,9 @@
         pill('Status API', `http://${host}/status`)
       ].join('');
       document.getElementById('cs2Status').innerHTML = cs2 ? [
+        pill('Game', cs2.found ? 'found' : 'missing', cs2.found ? 'ok' : 'warn'),
+        pill('Installed', cs2.installed ? 'yes' : 'no', cs2.installed ? 'ok' : 'warn'),
+        pill('Live', cs2.live ? 'yes' : 'no', cs2.live ? 'ok' : 'warn'),
         pill('Packets', cs2.receivedPayloads, cs2.receivedPayloads > 0 ? 'ok' : 'warn'),
         pill('Last update', cs2.lastUpdateUtc),
         renderGame(cs2.lastStatus)
@@ -502,6 +507,16 @@
     async function copyCs2Config() {
       const cfg = document.getElementById('cs2Config').textContent;
       await navigator.clipboard.writeText(cfg);
+    }
+
+    async function installCs2() {
+      const el = document.getElementById('cs2InstallResult');
+      el.textContent = 'Устанавливаю…';
+      const response = await api('/integrations/cs2/install', { method: 'POST' });
+      const body = await response.json().catch(() => ({}));
+      el.textContent = body.message || (response.ok ? 'Готово. Перезапустите Counter-Strike 2.' : 'Не получилось установить.');
+      el.className = response.ok ? 'small' : 'small danger';
+      await refreshAll();
     }
 
     function renderDeckDraft() {

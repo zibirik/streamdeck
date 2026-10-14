@@ -36,12 +36,14 @@ public static class RequestPinMiddleware
 {
     public const string HeaderName = "X-StreamPanel-Pin";
 
-    private static readonly string[] ProtectedPrefixes = ["/status", "/api/configurator", "/integrations"];
+    private static readonly string[] ProtectedPrefixes = ["/status", "/api/configurator", "/integrations", "/gsi"];
 
     public static IApplicationBuilder UseRequestPin(this IApplicationBuilder app) =>
         app.Use(async (context, next) =>
         {
-            if (!IsProtected(context.Request.Path))
+            // Counter-Strike posts game state and cannot send headers or a query PIN. The payload is HUD
+            // data only — it cannot run commands — so those two POST paths stay open.
+            if (IsGsiPost(context) || !IsProtected(context.Request.Path))
             {
                 await next();
                 return;
@@ -78,4 +80,9 @@ public static class RequestPinMiddleware
 
     private static bool IsProtected(PathString path) =>
         ProtectedPrefixes.Any(prefix => path.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase));
+
+    public static bool IsGsiPost(HttpContext context) =>
+        HttpMethods.IsPost(context.Request.Method) && (
+            context.Request.Path.Equals("/gsi", StringComparison.OrdinalIgnoreCase) ||
+            context.Request.Path.Equals("/integrations/cs2/gsi", StringComparison.OrdinalIgnoreCase));
 }

@@ -1,3 +1,5 @@
+using Windows.Media.Control;
+
 namespace StreamPanel.Server.Windows;
 
 public interface IMediaInfoService
@@ -6,80 +8,83 @@ public interface IMediaInfoService
     bool? IsMediaPlaying();
 }
 
+/// <summary>
+/// What is playing on this PC right now, from Windows' own media session list (the same one the volume flyout uses):
+/// Spotify, YouTube in a browser, VLC, the Windows media player and so on all show up here.
+/// </summary>
 public sealed class MediaInfoService : IMediaInfoService
 {
+    private static readonly TimeSpan CacheFor = TimeSpan.FromMilliseconds(800);
+
+    private readonly object _gate = new();
+    private GlobalSystemMediaTransportControlsSessionManager? _manager;
+    private Snapshot _cached = new(null, null, null, DateTimeOffset.MinValue);
+
     public (string? Title, string? Artist) GetNowPlaying()
     {
-        try
-        {
-            var managerType = Type.GetType("Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows, ContentType=WindowsRuntime");
-            if (managerType is null) return (null, null);
-
-            var requestAsync = managerType.GetMethod("RequestAsync");
-            if (requestAsync is null) return (null, null);
-
-            var task = requestAsync.Invoke(null, null);
-            if (task is null) return (null, null);
-
-            task.GetType().GetMethod("GetAwaiter")?.Invoke(task, null);
-            var resultProperty = task.GetType().GetProperty("Result");
-            var manager = resultProperty?.GetValue(task);
-            if (manager is null) return (null, null);
-
-            var getSession = manager.GetType().GetMethod("GetCurrentSession");
-            var session = getSession?.Invoke(manager, null);
-            if (session is null) return (null, null);
-
-            var mediaPropertiesAsync = session.GetType().GetMethod("TryGetMediaPropertiesAsync");
-            var mediaTask = mediaPropertiesAsync?.Invoke(session, null);
-            if (mediaTask is null) return (null, null);
-
-            mediaTask.GetType().GetMethod("GetAwaiter")?.Invoke(mediaTask, null);
-            var mediaResult = mediaTask.GetType().GetProperty("Result")?.GetValue(mediaTask);
-            if (mediaResult is null) return (null, null);
-
-            var title = mediaResult.GetType().GetProperty("Title")?.GetValue(mediaResult)?.ToString();
-            var artist = mediaResult.GetType().GetProperty("Artist")?.GetValue(mediaResult)?.ToString();
-            return (title, artist);
-        }
-        catch
-        {
-            return (null, null);
-        }
+        var snapshot = Read();
+        return (snapshot.Title, snapshot.Artist);
     }
 
-    public bool? IsMediaPlaying()
+    public bool? IsMediaPlaying() => Read().Playing;
+
+    private Snapshot Read()
     {
-        try
+        lock (_gate)
         {
-            var managerType = Type.GetType("Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows, ContentType=WindowsRuntime");
-            if (managerType is null) return null;
+            // The tablet asks for both the title and the state in one status poll; look only once.
+            if (DateTimeOffset.UtcNow - _cached.At < CacheFor)
+            {
+                return _cached;
+            }
 
-            var requestAsync = managerType.GetMethod("RequestAsync");
-            var task = requestAsync?.Invoke(null, null);
-            if (task is null) return null;
-
-            task.GetType().GetMethod("GetAwaiter")?.Invoke(task, null);
-            var manager = task.GetType().GetProperty("Result")?.GetValue(task);
-            if (manager is null) return null;
-
-            var getSession = manager.GetType().GetMethod("GetCurrentSession");
-            var session = getSession?.Invoke(manager, null);
-            if (session is null) return null;
-
-            var getPlaybackInfo = session.GetType().GetMethod("GetPlaybackInfo");
-            var playbackInfo = getPlaybackInfo?.Invoke(session, null);
-            if (playbackInfo is null) return null;
-
-            var status = playbackInfo.GetType().GetProperty("PlaybackStatus")?.GetValue(playbackInfo);
-            if (status is null) return null;
-
-            // Windows.Media.PlaybackStatus: Playing = 4
-            return Convert.ToInt32(status) == 4;
-        }
-        catch
-        {
-            return null;
+            _cached = Capture();
+            return _cached;
         }
     }
+
+    private Snapshot Capture()
+    {
+        var now = DateTimeOffset.UtcNow;
+        try
+        {
+            var session = PickSession();
+            if (session is null)
+            {
+                return new Snapshot(null, null, null, now);
+            }
+
+            var playing = session.GetPlaybackInfo().PlaybackStatus ==
+                          GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+            var properties = session.TryGetMediaPropertiesAsync().AsTask().GetAwaiter().GetResult();
+            return new Snapshot(Clean(properties.Title), Clean(properties.Artist), playing, now);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.Runtime.InteropServices.COMException or UnauthorizedAccessException)
+        {
+            // Media sessions come and go; "nothing playing" is the right answer when Windows cannot say.
+            _manager = null;
+            return new Snapshot(null, null, null, now);
+        }
+    }
+
+    /// <summary>A session that is actually playing beats the one Windows calls "current".</summary>
+    private GlobalSystemMediaTransportControlsSession? PickSession()
+    {
+        _manager ??= GlobalSystemMediaTransportControlsSessionManager.RequestAsync().AsTask().GetAwaiter().GetResult();
+
+        var sessions = _manager.GetSessions();
+        foreach (var candidate in sessions)
+        {
+            if (candidate.GetPlaybackInfo().PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing)
+            {
+                return candidate;
+            }
+        }
+
+        return _manager.GetCurrentSession() ?? sessions.FirstOrDefault();
+    }
+
+    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed record Snapshot(string? Title, string? Artist, bool? Playing, DateTimeOffset At);
 }

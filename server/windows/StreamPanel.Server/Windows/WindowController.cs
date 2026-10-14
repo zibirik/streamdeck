@@ -53,6 +53,13 @@ public sealed class WindowController(IInputSimulator inputSimulator) : IWindowCo
         var targetIndex = Math.Clamp(monitorIndex - 1, 0, monitors.Count - 1);
         var target = monitors[targetIndex];
 
+        // A maximized window ignores SetWindowPos: restore it, move it, then maximize it again on the new screen.
+        var wasMaximized = IsZoomed(hwnd);
+        if (wasMaximized)
+        {
+            ShowWindow(hwnd, 9); // SW_RESTORE
+        }
+
         if (!GetWindowRect(hwnd, out var windowRect))
         {
             throw new InvalidOperationException("Could not read active window bounds.");
@@ -76,6 +83,11 @@ public sealed class WindowController(IInputSimulator inputSimulator) : IWindowCo
         {
             throw new InvalidOperationException($"Failed to move window to monitor {monitorIndex}.");
         }
+
+        if (wasMaximized)
+        {
+            ShowWindow(hwnd, 3); // SW_MAXIMIZE
+        }
     }
 
     private static List<RECT> EnumerateMonitorsSorted()
@@ -98,6 +110,12 @@ public sealed class WindowController(IInputSimulator inputSimulator) : IWindowCo
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool IsZoomed(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);

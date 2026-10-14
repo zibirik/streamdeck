@@ -1,13 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>StreamPanel.Server</AssemblyName>
     <RootNamespace>StreamPanel.Server</RootNamespace>
     <!-- Default for local builds; release builds pass -p:Version=<tag>. -->
-    <Version>0.2.1</Version>
+    <Version>0.3.0</Version>
     <Company>zibirik</Company>
     <Product>StreamPanel</Product>
     <Copyright>Copyright 2026 zibirik</Copyright>

@@ -1,11 +1,14 @@
 package com.streampanel.core.integrations
 
+import com.streampanel.core.network.describeHttpFailure
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,11 +23,16 @@ class DiscordWebhookClient @Inject constructor(
         val username = payload["username"]
 
         val response = httpClient.post(webhookUrl) {
+            timeout { requestTimeoutMillis = 10_000 }
             contentType(ContentType.Application.Json)
             setBody(DiscordWebhookBody(content = content, username = username))
-        }.bodyAsText()
-
-        IntegrationResult.ok("Discord webhook sent: ${response.take(120)}")
+        }
+        val text = response.bodyAsText()
+        if (response.status.isSuccess()) {
+            IntegrationResult.ok("Discord: message sent")
+        } else {
+            IntegrationResult.error(describeHttpFailure("Discord", response.status.value, text))
+        }
     }.getOrElse { IntegrationResult.error(it.message ?: "Discord webhook failed") }
 }
 

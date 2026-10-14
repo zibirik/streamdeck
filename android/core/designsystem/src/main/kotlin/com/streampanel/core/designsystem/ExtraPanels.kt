@@ -24,6 +24,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.DeleteSweep
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.FormatAlignLeft
@@ -72,6 +73,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.streampanel.core.model.Cs2IntegrationInfo
 import com.streampanel.core.model.GameOverlaySettings
 import com.streampanel.core.model.GameTelemetryInfo
 import com.streampanel.core.model.PcProcessInfo
@@ -392,6 +394,9 @@ fun GameStatusPanel(
     gameInfo: GameTelemetryInfo,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    integration: Cs2IntegrationInfo = Cs2IntegrationInfo(),
+    onInstallIntegration: () -> Unit = {},
+    pcConnected: Boolean = false,
 ) {
     val s = strings()
     PanelCard(s.gameStatusTitle, Icons.Rounded.SportsEsports, modifier, s.gameStatusSub, UiPalette.Red) {
@@ -401,51 +406,222 @@ fun GameStatusPanel(
             return@PanelCard
         }
 
-        Text(
-            gameInfo.provider ?: gameInfo.processName ?: s.gameNotDetected,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (!gameInfo.detected) {
+        CounterStrikeSetup(integration, onInstallIntegration, pcConnected)
+
+        val hasHud = integration.live ||
+            (gameInfo.detected && (gameInfo.health != null || gameInfo.mapName != null || gameInfo.activity != null))
+        if (hasHud) {
+            CounterStrikeHud(settings, gameInfo)
+        } else {
             Text(
-                "${s.gameAutoProcesses}: ${settings.autoShowProcessPatterns}",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
+                gameInfo.provider ?: gameInfo.processName ?: s.gameNotDetected,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-        }
-        gameInfo.note?.let {
-            Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-        }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            gameInfo.processName?.let { InfoPill("EXE", it) }
-            if (settings.showMap) {
-                InfoPill(s.map, gameInfo.mapName ?: "—")
-                InfoPill(s.phase, gameInfo.phase ?: "—")
+            if (!gameInfo.detected) {
+                Text(
+                    "${s.gameAutoProcesses}: ${settings.autoShowProcessPatterns}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
-            if (settings.showHealth) {
-                InfoPill(s.health, gameInfo.health?.toString() ?: "—")
-                InfoPill(s.armor, gameInfo.armor?.toString() ?: "—")
-            }
-            if (settings.showAmmo) {
-                val ammo = listOfNotNull(gameInfo.ammoClip, gameInfo.ammoReserve).joinToString("/")
-                InfoPill(s.ammo, ammo.ifBlank { "—" })
-            }
-            if (settings.showScore) {
-                val score = if (gameInfo.teamScore != null || gameInfo.enemyScore != null) {
-                    "${gameInfo.teamScore ?: 0}:${gameInfo.enemyScore ?: 0}"
-                } else {
-                    "—"
-                }
-                InfoPill(s.score, score)
+            gameInfo.note?.let {
+                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
         BigButton(s.gameOverlaySettings, onOpenSettings, Modifier.fillMaxWidth(), icon = Icons.Rounded.Tune, filled = false)
     }
 }
 
+/** One line that says whether Counter-Strike is wired up, and the one button that fixes it if not. */
+@Composable
+private fun CounterStrikeSetup(integration: Cs2IntegrationInfo, onInstall: () -> Unit, pcConnected: Boolean) {
+    when {
+        !pcConnected -> StatusLine(
+            UiPalette.Slate,
+            pulsing = false,
+            text = tr("Подключите ПК (Настройки → Мой ПК), чтобы настроить Counter-Strike.", "Connect the PC (Settings → My PC) to set up Counter-Strike."),
+        )
+        !integration.probed -> StatusLine(
+            UiPalette.Amber,
+            pulsing = true,
+            text = tr("ПК на связи — жду статус Counter-Strike. Если это не проходит, проверьте PIN.", "PC is online — waiting for Counter-Strike status. If this stays, check the PIN."),
+        )
+        integration.live -> StatusLine(UiPalette.Green, pulsing = true, text = tr("Counter-Strike на связи", "Counter-Strike is connected"))
+        integration.installed -> StatusLine(
+            UiPalette.Amber,
+            pulsing = false,
+            text = if (integration.receivedPayloads > 0) {
+                tr(
+                    "Игра сейчас молчит (пакетов было ${integration.receivedPayloads}). Откройте матч или перезапустите CS2.",
+                    "The game is quiet right now (${integration.receivedPayloads} packets earlier). Open a match or restart CS2.",
+                )
+            } else {
+                tr(
+                    "Интеграция установлена. Запустите игру (если она уже открыта — перезапустите её один раз).",
+                    "The integration is installed. Start the game (if it is open, restart it once).",
+                )
+            },
+        )
+        integration.found -> {
+            StatusLine(
+                UiPalette.Red,
+                pulsing = false,
+                text = tr(
+                    "Чтобы видеть здоровье, патроны и счёт, один раз установите интеграцию — вручную ничего копировать не нужно.",
+                    "To see health, ammo and score, install the integration once — no copying files by hand.",
+                ),
+            )
+            BigButton(
+                text = tr("Установить интеграцию CS2", "Install the CS2 integration"),
+                onClick = onInstall,
+                modifier = Modifier.fillMaxWidth(),
+                icon = Icons.Rounded.Download,
+                color = UiPalette.Red,
+            )
+        }
+        else -> {
+            StatusLine(
+                UiPalette.Slate,
+                pulsing = false,
+                text = tr(
+                    "Counter-Strike 2 не найден в Steam на этом ПК. Если игра установлена — запустите её один раз и нажмите кнопку ниже.",
+                    "Counter-Strike 2 was not found in Steam on this PC. If the game is installed, start it once and tap the button below.",
+                ),
+            )
+            BigButton(
+                text = tr("Найти и установить", "Find and install"),
+                onClick = onInstall,
+                modifier = Modifier.fillMaxWidth(),
+                icon = Icons.Rounded.Download,
+                filled = false,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatusLine(color: Color, pulsing: Boolean, text: String) {
+    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        StatusDot(color, pulsing, size = 8)
+        Text(
+            text,
+            Modifier.padding(top = 2.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+/** What a player glances at in the game: map, score, health, weapon, money. Only what the user switched on. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CounterStrikeHud(settings: GameOverlaySettings, game: GameTelemetryInfo) {
+    val teamColor = when (game.team?.uppercase()) {
+        "CT" -> UiPalette.Blue
+        "T" -> UiPalette.Amber
+        else -> MaterialTheme.colorScheme.primary
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                if (settings.showMap) game.mapName ?: game.provider.orEmpty() else game.provider.orEmpty(),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val phase = phaseText(game.phase, game.activity)
+            if (phase != null) {
+                Text(phase, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (settings.showScore && (game.teamScore != null || game.enemyScore != null)) {
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(teamColor.copy(alpha = 0.16f))
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("${game.teamScore ?: 0}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = teamColor)
+                Text(":", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${game.enemyScore ?: 0}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+    }
+
+    val health = game.health
+    if (settings.showHealth && health != null) {
+        StatMeter(strings().health, health.toFloat(), Modifier.fillMaxWidth(), accent = UiPalette.Green, lowIsBad = true)
+        if ((game.armor ?: 0) > 0) {
+            StatMeter(strings().armor, game.armor?.toFloat(), Modifier.fillMaxWidth(), accent = UiPalette.Blue, lowIsBad = true)
+        }
+    }
+
+    if (settings.showAmmo && (game.weapon != null || game.ammoClip != null)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                game.weapon ?: strings().ammo,
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (game.ammoClip != null) {
+                Text("${game.ammoClip}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Text(" / ${game.ammoReserve ?: 0}", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (game.kills != null) InfoPill(tr("У / С / П", "K / D / A"), "${game.kills} / ${game.deaths ?: 0} / ${game.assists ?: 0}")
+        if (game.money != null) InfoPill(tr("Деньги", "Money"), "$${game.money}")
+        if (game.round != null) InfoPill(tr("Раунд", "Round"), "${game.round}")
+        if ((game.mvps ?: 0) > 0) InfoPill("MVP", "${game.mvps}")
+        bombText(game.bomb)?.let { InfoPill(tr("Бомба", "Bomb"), it) }
+        game.team?.let { InfoPill(tr("Сторона", "Side"), it.uppercase()) }
+    }
+}
+
+@Composable
+private fun phaseText(phase: String?, activity: String?): String? {
+    if (activity.equals("menu", ignoreCase = true)) return tr("В меню", "In the menu")
+    return when (phase?.lowercase()) {
+        "live" -> tr("Раунд идёт", "Round in progress")
+        "freezetime" -> tr("Закупка", "Buy time")
+        "over" -> tr("Раунд закончен", "Round over")
+        "warmup" -> tr("Разминка", "Warmup")
+        "intermission" -> tr("Перерыв", "Halftime")
+        "gameover" -> tr("Игра окончена", "Game over")
+        null -> null
+        else -> phase
+    }
+}
+
+@Composable
+private fun bombText(bomb: String?): String? = when (bomb?.lowercase()) {
+    "planted" -> tr("заложена!", "planted!")
+    "defused" -> tr("обезврежена", "defused")
+    "exploded" -> tr("взорвалась", "exploded")
+    "carried", "dropped" -> null
+    else -> null
+}
 @Composable
 fun PcConfiguratorPanel(
     url: String?,

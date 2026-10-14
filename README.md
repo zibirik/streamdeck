@@ -233,7 +233,7 @@ Default port: **17820** (change it with `StreamPanel:Port`).
 | `GET /` | PC Configurator web UI | no (API calls need it) |
 | `GET /status` | Live PC telemetry | yes |
 | `WS /ws` | Command channel from tablet | yes (`auth` command) |
-| `POST /integrations/cs2/gsi` | Counter-Strike 2 GSI | yes (`?pin=`) |
+| `POST /gsi` | Counter-Strike 2 Game State Integration | no (CS2 cannot send a PIN) |
 | `GET/POST /api/configurator/draft` | Web configurator drafts | yes |
 
 Protocol details: [`docs/protocol.md`](docs/protocol.md)
@@ -277,10 +277,9 @@ Fix in OBS: **Settings → Stream** (service, server, stream key).
 <details>
 <summary><b>CS2 HUD not updating</b></summary>
 
-1. Download the GSI config from `http://PC_IP:17820/` → CS2 HUD tab (it already contains your PIN)
-2. Place it in `csgo/cfg/`
-3. Restart CS2
-4. Check `http://PC_IP:17820/integrations/cs2/status`
+1. On the tablet: **Stream → CS2** → **Install the CS2 integration** (or the same button on the PC Configurator CS2 tab)
+2. Restart Counter-Strike 2 once
+3. Open a match or a training map — the HUD should fill in. `http://PC_IP:17820/integrations/cs2/status` shows `live: true` and a rising packet count.
 
 </details>
 

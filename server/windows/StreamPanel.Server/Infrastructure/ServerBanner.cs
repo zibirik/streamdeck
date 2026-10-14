@@ -5,7 +5,7 @@ namespace StreamPanel.Server.Infrastructure;
 
 public static class ServerBanner
 {
-    public static void Print(int port, bool pinRequired)
+    public static void Print(int port, PinBootstrapResult pin)
     {
         Console.WriteLine();
         Console.WriteLine("  ╔══════════════════════════════════════╗");
@@ -29,14 +29,20 @@ public static class ServerBanner
         Console.WriteLine();
         Console.WriteLine($"  Status  : http://localhost:{port}/status");
         Console.WriteLine();
-        if (pinRequired)
+        switch (pin.Source)
         {
-            Console.WriteLine("  Security: PIN is required for remote clients.");
-        }
-        else
-        {
-            Console.WriteLine("  WARNING : no PIN is set - anyone on this network can control this PC.");
-            Console.WriteLine("            Set StreamPanel:Pin in appsettings.json and the same PIN on the tablet.");
+            case PinSource.Generated:
+                Console.WriteLine($"  PIN     : {pin.Pin}   <- type this into the app (Settings > My PC)");
+                Console.WriteLine("            It was made for you on first start and is remembered.");
+                Console.WriteLine($"            To choose your own, write it in {UserData.SettingsFilePath}");
+                break;
+            case PinSource.Configured:
+                Console.WriteLine("  Security: your own PIN is required for remote clients.");
+                break;
+            default:
+                Console.WriteLine("  WARNING : the PIN is switched off - anyone on this network can control this PC.");
+                Console.WriteLine("            Remove the line with Pin = off from your settings to get a PIN again.");
+                break;
         }
 
         Console.WriteLine("  Press Ctrl+C to stop.");

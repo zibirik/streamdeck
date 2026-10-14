@@ -19,8 +19,23 @@ public sealed class InputSimulator : IInputSimulator
     {
         foreach (var character in text)
         {
-            SendUnicode(character, keyUp: false);
-            SendUnicode(character, keyUp: true);
+            switch (character)
+            {
+                case '\r':
+                    continue; // "\r\n" is one line break, sent once below
+                case '\n':
+                    SendVirtualKey(0x0D, keyUp: false);
+                    SendVirtualKey(0x0D, keyUp: true);
+                    break;
+                case '\t':
+                    SendVirtualKey(0x09, keyUp: false);
+                    SendVirtualKey(0x09, keyUp: true);
+                    break;
+                default:
+                    SendUnicode(character, keyUp: false);
+                    SendUnicode(character, keyUp: true);
+                    break;
+            }
         }
     }
 
@@ -44,27 +59,18 @@ public sealed class InputSimulator : IInputSimulator
 
     public void SendHotkey(string hotkey)
     {
-        var keys = hotkey
-            .Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Select(ParseVirtualKey)
-            .ToList();
-
-        if (keys.Count == 0)
-        {
-            throw new InvalidOperationException("Hotkey cannot be empty.");
-        }
+        var keys = HotkeyParser.Parse(hotkey);
 
         foreach (var key in keys)
         {
-            SendVirtualKey(key, keyUp: false);
+            SendVirtualKey(key.VirtualKey, keyUp: false, key.Extended);
         }
 
-        foreach (var key in keys.AsEnumerable().Reverse())
+        foreach (var key in keys.Reverse())
         {
-            SendVirtualKey(key, keyUp: true);
+            SendVirtualKey(key.VirtualKey, keyUp: true, key.Extended);
         }
     }
-
     public void MoveMouse(int deltaX, int deltaY)
     {
         SendMouse(MOUSEEVENTF_MOVE, deltaX, deltaY, 0);
@@ -87,29 +93,6 @@ public sealed class InputSimulator : IInputSimulator
         SendMouse(MOUSEEVENTF_WHEEL, 0, 0, delta);
     }
 
-    private static ushort ParseVirtualKey(string key) =>
-        key.ToUpperInvariant() switch
-        {
-            "CTRL" or "CONTROL" => 0x11,
-            "SHIFT" => 0x10,
-            "ALT" => 0x12,
-            "WIN" or "META" => 0x5B,
-            "ENTER" => 0x0D,
-            "ESC" or "ESCAPE" => 0x1B,
-            "TAB" => 0x09,
-            "SPACE" => 0x20,
-            "`" or "BACKTICK" or "OEM_3" => 0xC0,
-            "BACKSPACE" => 0x08,
-            "DELETE" or "DEL" => 0x2E,
-            "UP" => 0x26,
-            "DOWN" => 0x28,
-            "LEFT" => 0x25,
-            "RIGHT" => 0x27,
-            { Length: 1 } value when char.IsLetterOrDigit(value[0]) => (ushort)char.ToUpperInvariant(value[0]),
-            var value when value.StartsWith('F') && int.TryParse(value[1..], out var n) && n is >= 1 and <= 24 => (ushort)(0x70 + n - 1),
-            _ => throw new InvalidOperationException($"Unsupported hotkey token '{key}'.")
-        };
-
     private static void SendUnicode(char character, bool keyUp)
     {
         var input = new INPUT
@@ -127,7 +110,7 @@ public sealed class InputSimulator : IInputSimulator
         SendInputChecked(input);
     }
 
-    private static void SendVirtualKey(ushort virtualKey, bool keyUp)
+    private static void SendVirtualKey(ushort virtualKey, bool keyUp, bool extended = false)
     {
         var input = new INPUT
         {
@@ -137,7 +120,9 @@ public sealed class InputSimulator : IInputSimulator
                 ki = new KEYBDINPUT
                 {
                     wVk = virtualKey,
-                    dwFlags = keyUp ? KEYEVENTF_KEYUP : 0
+                    // The scan code makes games and remote tools, which look at it instead of the key code, see the key too.
+                    wScan = (ushort)MapVirtualKey(virtualKey, MAPVK_VK_TO_VSC),
+                    dwFlags = (keyUp ? KEYEVENTF_KEYUP : 0) | (extended ? KEYEVENTF_EXTENDEDKEY : 0)
                 }
             }
         };
@@ -174,7 +159,9 @@ public sealed class InputSimulator : IInputSimulator
 
     private const int INPUT_KEYBOARD = 1;
     private const int INPUT_MOUSE = 0;
+    private const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
     private const uint KEYEVENTF_KEYUP = 0x0002;
+    private const uint MAPVK_VK_TO_VSC = 0;
     private const uint KEYEVENTF_UNICODE = 0x0004;
     private const uint MOUSEEVENTF_MOVE = 0x0001;
     private const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
@@ -182,6 +169,9 @@ public sealed class InputSimulator : IInputSimulator
     private const uint MOUSEEVENTF_RIGHTDOWN = 0x0008;
     private const uint MOUSEEVENTF_RIGHTUP = 0x0010;
     private const uint MOUSEEVENTF_WHEEL = 0x0800;
+
+    [DllImport("user32.dll")]
+    private static extern uint MapVirtualKey(uint code, uint mapType);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);

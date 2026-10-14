@@ -107,7 +107,7 @@ public sealed class CommandHandler(
             return PcCommandResponse.Failure(command.Id, $"Folder not found: {path}");
         }
 
-        Process.Start(new ProcessStartInfo("explorer.exe", path) { UseShellExecute = true });
+        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{path}\"") { UseShellExecute = true });
         return PcCommandResponse.Success(command.Id, $"Opened folder {path}.");
     }
 
@@ -273,7 +273,8 @@ public sealed class CommandHandler(
                 Process.Start(new ProcessStartInfo("rundll32.exe", "user32.dll,LockWorkStation") { UseShellExecute = false });
                 break;
             case "sleep":
-                Process.Start(new ProcessStartInfo("rundll32.exe", "powrprof.dll,SetSuspendState 0,1,0") { UseShellExecute = false });
+                // rundll32 powrprof,SetSuspendState hibernates on PCs with hybrid sleep. The Forms API actually sleeps.
+                System.Windows.Forms.Application.SetSuspendState(PowerState.Suspend, force: false, disableWakeEvent: false);
                 break;
             case "task_manager":
                 inputSimulator.SendHotkey("CTRL+SHIFT+ESC");
@@ -304,45 +305,42 @@ public sealed class CommandHandler(
                 Process.GetProcessById(pid).Kill(entireProcessTree: true);
                 break;
             case "git_pull":
-                RunShell("git", "pull", GetWorkDir(command));
-                break;
+                return RunTool(command, "git", "pull", GetWorkDir(command), seconds: 90);
             case "git_status":
-                RunShell("git", "status", GetWorkDir(command));
-                break;
+                return RunTool(command, "git", "status", GetWorkDir(command), seconds: 20);
             case "docker_ps":
-                RunShell("docker", "ps", null);
-                break;
+                return RunTool(command, "docker", "ps", null, seconds: 20);
             case "docker_compose_up":
-                RunShell("docker", "compose up -d", GetWorkDir(command));
-                break;
+                return RunTool(command, "docker", "compose up -d", GetWorkDir(command), seconds: 120);
             case "wifi_restart":
-                RunShell(
+                return RunTool(
+                    command,
                     "powershell.exe",
                     "-NoProfile -Command \"Get-NetAdapter | Where-Object Status -eq 'Up' | Restart-NetAdapter -Confirm:$false\"",
-                    null);
-                break;
+                    null,
+                    seconds: 40);
             case "flush_dns":
-                RunShell("ipconfig", "/flushdns", null);
-                break;
+                return RunTool(command, "ipconfig", "/flushdns", null, seconds: 15);
             case "empty_recycle_bin":
-                RunShell(
+                return RunTool(
+                    command,
                     "powershell.exe",
                     "-NoProfile -Command \"Clear-RecycleBin -Force -ErrorAction SilentlyContinue\"",
-                    null);
-                break;
+                    null,
+                    seconds: 30);
             case "discord_mute":
-                FocusProcess("Discord");
-                Thread.Sleep(150);
+                FocusDiscord();
+                Thread.Sleep(200);
                 inputSimulator.SendHotkey("CTRL+SHIFT+M");
                 break;
             case "discord_deafen":
-                FocusProcess("Discord");
-                Thread.Sleep(150);
+                FocusDiscord();
+                Thread.Sleep(200);
                 inputSimulator.SendHotkey("CTRL+SHIFT+D");
                 break;
             case "discord_ptt":
-                FocusProcess("Discord");
-                Thread.Sleep(150);
+                FocusDiscord();
+                Thread.Sleep(200);
                 inputSimulator.SendHotkey(command.Payload.GetValueOrDefault("keys", "CTRL+`"));
                 break;
             default:
@@ -364,31 +362,46 @@ public sealed class CommandHandler(
         return PcCommandResponse.Success(command.Id, "Custom command accepted.");
     }
 
-    private static string GetWorkDir(PcCommand command)
+    /// <summary>The folder git and docker run in: the one the button names, else the one in the settings, else the user's home.</summary>
+    private string GetWorkDir(PcCommand command)
     {
         if (command.Payload.TryGetValue("path", out var path) && !string.IsNullOrWhiteSpace(path))
         {
             return PathExpander.Expand(path);
         }
 
+        var configured = configuration["StreamPanel:DevWorkDirectory"];
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return PathExpander.Expand(configured);
+        }
+
         return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
     }
 
-    private static void RunShell(string fileName, string arguments, string? workingDirectory)
+    /// <summary>Runs a tool and reports what it printed, so the tablet can show the real answer or the real error.</summary>
+    private PcCommandResponse RunTool(PcCommand command, string fileName, string arguments, string? workingDirectory, int seconds)
     {
-        var startInfo = new ProcessStartInfo(fileName, arguments)
+        var result = ShellRunner.Run(fileName, arguments, workingDirectory, TimeSpan.FromSeconds(seconds));
+
+        if (result.Succeeded)
         {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-        if (!string.IsNullOrWhiteSpace(workingDirectory))
-        {
-            startInfo.WorkingDirectory = workingDirectory;
+            return PcCommandResponse.Success(command.Id, result.Output.Length > 0 ? result.Output : "Done.");
         }
 
-        Process.Start(startInfo);
-    }
+        var message = !result.Started
+            ? result.Output
+            : result.TimedOut
+                ? $"Stopped after {seconds} s without finishing.\n{result.Output}".Trim()
+                : $"Failed (exit code {result.ExitCode}).\n{result.Output}".Trim();
 
+        if (result.Output.Contains("not a git repository", StringComparison.OrdinalIgnoreCase))
+        {
+            message += "\nSet StreamPanel:DevWorkDirectory in appsettings.user.json to your project folder.";
+        }
+
+        return PcCommandResponse.Failure(command.Id, message);
+    }
     private static void CleanTempFolders()
     {
         foreach (var path in new[] { Path.GetTempPath(), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp") })
@@ -401,9 +414,12 @@ public sealed class CommandHandler(
         }
     }
 
-    private static void FocusProcess(string processName)
+    private static void FocusDiscord() => FocusProcess("Discord", "DiscordPTB", "DiscordCanary");
+
+    private static void FocusProcess(params string[] processNames)
     {
-        var process = Process.GetProcessesByName(processName)
+        var process = processNames
+            .SelectMany(name => Process.GetProcessesByName(name))
             .FirstOrDefault(p => p.MainWindowHandle != IntPtr.Zero);
         if (process == null)
         {
@@ -416,7 +432,8 @@ public sealed class CommandHandler(
                 Process.Start(new ProcessStartInfo(updatePath, "--processStart Discord.exe") { UseShellExecute = true });
             }
             Thread.Sleep(800);
-            process = Process.GetProcessesByName(processName)
+            process = processNames
+                .SelectMany(name => Process.GetProcessesByName(name))
                 .FirstOrDefault(p => p.MainWindowHandle != IntPtr.Zero);
         }
 

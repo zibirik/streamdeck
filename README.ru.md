@@ -233,7 +233,7 @@ Android Studio, .NET и другие инструменты разработчи
 | `GET /` | PC Configurator (веб UI) | нет (запросы к API — да) |
 | `GET /status` | Live telemetry ПК | да |
 | `WS /ws` | Команды с планшета | да (команда `auth`) |
-| `POST /integrations/cs2/gsi` | Counter-Strike 2 GSI | да (`?pin=`) |
+| `POST /gsi` | Counter-Strike 2 Game State Integration | нет (CS2 не умеет слать PIN) |
 | `GET/POST /api/configurator/draft` | Draft веб-конфигуратора | да |
 
 Протокол: [`docs/protocol.md`](docs/protocol.md)
@@ -277,10 +277,9 @@ StreamPanel **подключился** — OBS попытался начать �
 <details>
 <summary><b>CS2 HUD не обновляется</b></summary>
 
-1. Скачай GSI config: `http://IP_ПК:17820/` → вкладка CS2 HUD (PIN уже внутри файла)
-2. Положи в `csgo/cfg/`
-3. Перезапусти CS2
-4. Проверь `http://IP_ПК:17820/integrations/cs2/status`
+1. На планшете: **Стрим → CS2** → **Установить интеграцию CS2** (та же кнопка есть во вкладке CS2 HUD веб-конфигуратора)
+2. Один раз перезапустите Counter-Strike 2
+3. Откройте матч или тренировку — HUD заполнится. `http://IP_ПК:17820/integrations/cs2/status` покажет `live: true` и растущий счётчик пакетов.
 
 </details>
 

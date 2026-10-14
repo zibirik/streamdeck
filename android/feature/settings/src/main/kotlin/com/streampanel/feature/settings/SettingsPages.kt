@@ -603,6 +603,20 @@ private fun GamePage(state: SettingsUiState, vm: SettingsViewModel) {
         checked = game.enabled,
         onChange = { vm.setGameOverlaySettings(game.copy(enabled = it)) },
     )
+    SoftCard {
+        HintText(
+            tr(
+                "Чтобы видеть здоровье, патроны, счёт и карту из Counter-Strike 2, один раз установите интеграцию: приложение само найдёт игру на ПК и положит нужный файл.",
+                "To see health, ammo, score and map from Counter-Strike 2, install the integration once: the app finds the game on the PC and puts the file there.",
+            ),
+        )
+        BigButton(
+            text = tr("Установить интеграцию CS2", "Install the CS2 integration"),
+            onClick = vm::installCs2,
+            modifier = Modifier.fillMaxWidth(),
+            icon = Icons.Rounded.Download,
+        )
+    }
     AnimatedVisibility(game.enabled, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             SectionLabel(tr("Что показывать", "What to show"))

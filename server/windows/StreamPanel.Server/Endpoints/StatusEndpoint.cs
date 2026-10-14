@@ -33,7 +33,8 @@ public static class StatusEndpoint
             IProcessMonitorService processMonitorService,
             ConnectionTracker connectionTracker,
             PinAuthService pinAuthService,
-            IGameTelemetryService gameTelemetryService
+            IGameTelemetryService gameTelemetryService,
+            ICs2IntegrationService cs2Integration
         ) =>
         {
             hardwareStatsService.Refresh();
@@ -99,6 +100,7 @@ public static class StatusEndpoint
                 topProcesses,
                 foregroundTitle,
                 gameInfo = gameTelemetryService.GetStatus(foregroundProcess, foregroundTitle),
+                cs2 = Cs2Summary(cs2Integration, gameTelemetryService),
                 cpuPercent = hardwareStatsService.CpuPercent,
                 ramPercent = hardwareStatsService.RamPercent,
                 clipboardPreview = clipboardService.GetText() is { Length: > 0 } clip
@@ -109,6 +111,19 @@ public static class StatusEndpoint
                 recentCommands = commandLog.Recent()
             });
         });
+    }
+
+    /// <summary>Is the Counter-Strike integration set up, and is the game sending data right now?</summary>
+    private static object Cs2Summary(ICs2IntegrationService integration, IGameTelemetryService telemetry)
+    {
+        var install = integration.GetStatus();
+        return new
+        {
+            found = install.Found,
+            installed = install.Installed,
+            live = telemetry.IsCounterStrikeLive,
+            receivedPayloads = telemetry.ReceivedPayloads,
+        };
     }
 
     private static bool IsUsableDrive(DriveInfo drive)

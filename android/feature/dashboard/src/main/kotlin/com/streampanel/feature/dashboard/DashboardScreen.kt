@@ -6,6 +6,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Check
@@ -136,6 +141,8 @@ fun DashboardRoute(
         onWifiRestart = viewModel::restartWifi,
         onFlushDns = viewModel::flushDns,
         onEmptyRecycleBin = viewModel::emptyRecycleBin,
+        onInstallCs2 = viewModel::installCs2Integration,
+        onDismissCommandOutput = viewModel::dismissCommandOutput,
     )
 }
 
@@ -215,13 +222,16 @@ fun DashboardScreen(
     onWifiRestart: () -> Unit,
     onFlushDns: () -> Unit,
     onEmptyRecycleBin: () -> Unit,
+    onInstallCs2: () -> Unit,
+    onDismissCommandOutput: () -> Unit,
 ) {
     val s = strings()
+    val russian = s.isRussian
     var messageShown by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(state.lastMessage) {
         val message = state.lastMessage
         if (message != null) {
-            messageShown = message
+            messageShown = MessageLocalizer.localize(message, russian)
             delay(2600)
             messageShown = null
         }
@@ -289,6 +299,7 @@ fun DashboardScreen(
         onWifiRestart = onWifiRestart,
         onFlushDns = onFlushDns,
         onEmptyRecycleBin = onEmptyRecycleBin,
+        onInstallCs2 = onInstallCs2,
     )
 
     AppBackdrop {
@@ -343,6 +354,8 @@ fun DashboardScreen(
         )
     }
 
+    state.commandOutput?.let { CommandOutputDialog(it, onDismissCommandOutput) }
+
     if (state.showSleepConfirm) {
         StreamDialog(onDismiss = onDismissSleep, title = s.sleepConfirmTitle, message = s.sleepConfirmBody) {
             BigButton(s.sleepNow, onConfirmSleep, Modifier.fillMaxWidth(), icon = Icons.Rounded.Bedtime, color = UiPalette.Violet)
@@ -381,5 +394,39 @@ private fun LayerSettingsDialog(
         }
         BigButton(s.apply, { onApply(title, rows, cols) }, Modifier.fillMaxWidth(), icon = Icons.Rounded.Check)
         BigButton(s.cancel, onDismiss, Modifier.fillMaxWidth(), filled = false)
+    }
+}
+
+/** The answer of a program the PC ran (git, docker...): readable, scrollable and copyable. */
+@Composable
+private fun CommandOutputDialog(output: CommandOutput, onDismiss: () -> Unit) {
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var copied by remember(output) { mutableStateOf(false) }
+    StreamDialog(
+        onDismiss = onDismiss,
+        title = (if (output.ok) "✓ " else "✕ ") + output.title,
+    ) {
+        Text(
+            output.text.ifBlank { "—" },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 260.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .verticalScroll(rememberScrollState())
+                .padding(14.dp),
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+            color = if (output.ok) MaterialTheme.colorScheme.onSurface else UiPalette.Red,
+        )
+        BigButton(
+            text = if (copied) tr("Скопировано ✓", "Copied ✓") else tr("Копировать", "Copy"),
+            onClick = {
+                clipboard.setText(androidx.compose.ui.text.AnnotatedString(output.text))
+                copied = true
+            },
+            modifier = Modifier.fillMaxWidth(),
+            filled = false,
+        )
+        BigButton(tr("Закрыть", "Close"), onDismiss, Modifier.fillMaxWidth())
     }
 }

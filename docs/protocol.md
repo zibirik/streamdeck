@@ -68,6 +68,10 @@ HTTP endpoints `/status`, `/api/configurator/*` and `/integrations/*` use the sa
 `X-StreamPanel-Pin` header or the `pin` query parameter (`401` = missing/wrong, `429` = locked out).
 `GET /api` is public and returns `name`, `machineName` and `pinRequired`, which is what LAN discovery uses.
 
+`POST /gsi` and `POST /integrations/cs2/gsi` are open: Counter-Strike 2 posts game-state JSON and cannot send
+headers. Those paths only accept HUD data; they cannot run commands. One-tap install is `POST /integrations/cs2/install`
+(PIN required from the tablet).
+
 ## Limits
 
 - A WebSocket message may be at most `StreamPanel:MaxMessageBytes` (default 1 MiB); larger messages close the connection.

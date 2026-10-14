@@ -23,6 +23,8 @@ import com.streampanel.core.network.DiscoveredServer
 import com.streampanel.core.network.LanServerDiscovery
 import com.streampanel.core.network.PcConnectionClient
 import com.streampanel.core.network.PcConnectionManager
+import com.streampanel.core.network.PcStatusClient
+import com.streampanel.core.network.Cs2InstallOutcome
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -44,6 +46,10 @@ enum class SettingsMessageKind {
     NothingToExport,
     NoTimeEntries,
     TimeCsvReady,
+    Cs2Installed,
+    Cs2NotFound,
+    Cs2WrongPin,
+    Cs2Failed,
 }
 
 data class SettingsMessage(val kind: SettingsMessageKind, val detail: String? = null)
@@ -55,6 +61,7 @@ class SettingsViewModel @Inject constructor(
     private val connectionManager: PcConnectionManager,
     private val pcConnectionClient: PcConnectionClient,
     private val lanServerDiscovery: LanServerDiscovery,
+    private val pcStatusClient: PcStatusClient,
     private val json: Json,
 ) : ViewModel() {
     private val exportJson = MutableStateFlow<String?>(null)
@@ -230,6 +237,17 @@ class SettingsViewModel @Inject constructor(
         serverHostDraft.value = server.host
         serverPortDraft.value = server.port.toString()
     }
+    /** Asks the PC to put the Counter-Strike 2 config file where the game reads it. */
+    fun installCs2() = viewModelScope.launch {
+        val server = uiState.value.server
+        message.value = when (val outcome = pcStatusClient.installCs2(server.host, server.port, server.pin)) {
+            Cs2InstallOutcome.Installed -> SettingsMessage(SettingsMessageKind.Cs2Installed)
+            Cs2InstallOutcome.GameNotFound -> SettingsMessage(SettingsMessageKind.Cs2NotFound)
+            Cs2InstallOutcome.WrongPin -> SettingsMessage(SettingsMessageKind.Cs2WrongPin)
+            is Cs2InstallOutcome.Failed -> SettingsMessage(SettingsMessageKind.Cs2Failed, outcome.reason)
+        }
+    }
+
     fun setKeepScreenOn(enabled: Boolean) = viewModelScope.launch {
         preferencesDataSource.setKeepScreenOn(enabled)
     }

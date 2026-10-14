@@ -259,6 +259,7 @@ class ShellScreenshotTest {
         onWifiRestart = {},
         onFlushDns = {},
         onEmptyRecycleBin = {},
+        onInstallCs2 = {},
 
     )
 }

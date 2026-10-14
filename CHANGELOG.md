@@ -5,6 +5,19 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-14
+
+### Fixed
+- Counter-Strike hub: Game State Integration posts were blocked by the PIN (CS2 cannot send headers), the game
+  was missed when installed on another Steam library or while running, and the HUD hid itself in the menu.
+  Install now finds CS2 from the running process, Steam libraries and `appmanifest_730`, writes a Valve-shaped
+  config that posts to `http://127.0.0.1:<port>/gsi`, and the tablet / web UI can set it up in one tap.
+- Sleep put many PCs into hibernate because of hybrid sleep; it now requests a real suspend.
+- Discord mute/deafen now looks for PTB and Canary as well as stable.
+- Switching speakers/headphones, media “now playing”, hotkeys and HTTP/MQTT/Hue/Spotify/Streamlabs calls
+  report a real error instead of a silent or fake success.
+- `git status` / `git pull` / `docker` / Wi-Fi / DNS / recycle bin show what the PC printed, not just “sent”.
+
 ### Changed
 - The app shell is redesigned: a side rail on tablets and a bottom bar on phones with five clear places —
   **Deck** (your buttons and layers), **Control**, **Stream**, **My PC** and **Work** — instead of one endless
@@ -16,9 +29,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Panels settings are simpler: pick which panels each screen shows and in what order (the tablet "zones" are gone).
 - Backdrop glows are drawn with gradients instead of blurred boxes, so they look right on every Android version.
 - Editor and OBS screens follow the theme colors (no more white-on-white text on the Light theme).
+- Deck confirmations (volume, layers, Counter-Strike install, …) are shown in Russian when the app language is Russian.
+- With no PIN in settings the server generates one on first start and shows it on the PC (tray + console). `"Pin": "off"` still disables it.
 
 ### Added
 - UI smoke tests that render every screen on the JVM (Robolectric) and save screenshots; CI uploads them as an artifact.
+- One-tap CS2 install from the tablet Stream tab, Settings → Games, and the PC Configurator CS2 HUD tab.
+
 ## [0.2.1] - 2026-10-14
 
 ### Changed

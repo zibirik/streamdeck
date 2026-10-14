@@ -16,6 +16,7 @@ import com.streampanel.core.integrations.StreamlabsClient
 import com.streampanel.core.network.HttpActionClient
 import com.streampanel.core.network.PcCommand
 import com.streampanel.core.network.PcCommandType
+import com.streampanel.core.network.DEFAULT_COMMAND_TIMEOUT_MS
 import com.streampanel.core.network.PcConnectionClient
 import com.streampanel.core.network.RawSocketClient
 import kotlinx.coroutines.delay
@@ -100,9 +101,18 @@ class ActionExecutor @Inject constructor(
                 payload = action.payload,
                 createdAtEpochMs = System.currentTimeMillis(),
             ),
+            timeoutMs = timeoutFor(commandType, action.payload),
         )
         return ActionExecutionResult(action.id, response.ok, response.message)
     }
+
+    /** Commands that run a program on the PC (git pull, docker...) may take a while; everything else answers at once. */
+    private fun timeoutFor(commandType: PcCommandType, payload: Map<String, String>): Long =
+        if (commandType == PcCommandType.SYSTEM_COMMAND && payload["name"] in LONG_RUNNING_SYSTEM_COMMANDS) {
+            LONG_COMMAND_TIMEOUT_MS
+        } else {
+            DEFAULT_COMMAND_TIMEOUT_MS
+        }
 
     private suspend fun runDelay(action: ControlAction): ActionExecutionResult {
         val duration = action.payload["durationMs"]?.toLongOrNull()?.coerceIn(0, 60_000) ?: 250L
@@ -201,4 +211,11 @@ data class ActionExecutionResult(
     val actionId: String,
     val ok: Boolean,
     val message: String,
+)
+
+/** The PC stops these itself after at most two minutes, so the tablet waits a little longer than that. */
+const val LONG_COMMAND_TIMEOUT_MS = 130_000L
+
+private val LONG_RUNNING_SYSTEM_COMMANDS = setOf(
+    "git_pull", "git_status", "docker_ps", "docker_compose_up", "wifi_restart", "flush_dns", "empty_recycle_bin",
 )

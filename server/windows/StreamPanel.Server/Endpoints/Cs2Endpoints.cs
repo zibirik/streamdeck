@@ -9,78 +9,117 @@ public static class Cs2Endpoints
 {
     public static void MapCs2Endpoints(this WebApplication app)
     {
-        app.MapGet("/integrations/cs2/gsi", (HttpContext context, IGameTelemetryService telemetry) => Results.Ok(new
-        {
-            ok = true,
-            message = "CS2 GSI endpoint is ready. Send POST JSON here from Counter-Strike 2.",
-            configUrl = $"{BaseUrl(context)}/integrations/cs2/config",
-            statusUrl = $"{BaseUrl(context)}/integrations/cs2/status",
-            receivedPayloads = telemetry.ReceivedPayloads,
-            lastUpdateUtc = telemetry.LastUpdateUtc,
-            lastStatus = telemetry.LastStatus
-        }));
+        app.MapGet(Cs2IntegrationService.GsiPath, Ready);
+        app.MapGet("/integrations/cs2/gsi", Ready);
 
-        app.MapPost("/integrations/cs2/gsi", async (HttpContext context, IGameTelemetryService telemetry) =>
+        // Short path first: CS2's HTTP client has historically failed on long URLs and cannot send a PIN header.
+        app.MapPost(Cs2IntegrationService.GsiPath, Ingest);
+        app.MapPost("/integrations/cs2/gsi", Ingest);
+
+        app.MapGet("/integrations/cs2/status", (IGameTelemetryService telemetry, ICs2IntegrationService cs2) =>
         {
-            try
+            var install = cs2.GetStatus();
+            return Results.Ok(new
             {
-                using var payload = await JsonDocument.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted);
-                telemetry.UpdateFromCounterStrike(payload.RootElement.Clone());
-                return Results.Ok(new { ok = true, source = "cs2-gsi" });
-            }
-            catch (JsonException)
-            {
-                return Results.BadRequest(new { ok = false, error = "invalid_json" });
-            }
+                ok = true,
+                live = telemetry.IsCounterStrikeLive,
+                found = install.Found,
+                installed = install.Installed,
+                configDirectory = install.ConfigDirectory,
+                receivedPayloads = telemetry.ReceivedPayloads,
+                lastUpdateUtc = telemetry.LastUpdateUtc,
+                lastStatus = telemetry.LastStatus
+            });
         });
 
-        app.MapGet("/integrations/cs2/status", (IGameTelemetryService telemetry) => Results.Ok(new
+        // One tap from the tablet (or the web page): find the game and drop the config file next to it.
+        app.MapPost("/integrations/cs2/install", (ICs2IntegrationService cs2, IConfiguration configuration) =>
         {
-            ok = true,
-            receivedPayloads = telemetry.ReceivedPayloads,
-            lastUpdateUtc = telemetry.LastUpdateUtc,
-            lastStatus = telemetry.LastStatus
-        }));
+            var result = cs2.Install(LocalGsiUri(configuration));
+            return ResultOf(result);
+        });
 
-        app.MapGet("/integrations/cs2/config", (HttpContext context, PinAuthService pinAuth) =>
-            Results.Text(BuildConfig(context, pinAuth), "text/plain; charset=utf-8"));
+        app.MapDelete("/integrations/cs2/install", (ICs2IntegrationService cs2) => ResultOf(cs2.Uninstall()));
 
-        app.MapGet("/integrations/cs2/download-config", (HttpContext context, PinAuthService pinAuth) =>
+        app.MapGet("/integrations/cs2/config", (HttpContext context, IConfiguration configuration) =>
+            Results.Text(BuildConfig(context, configuration), "text/plain; charset=utf-8"));
+
+        app.MapGet("/integrations/cs2/download-config", (HttpContext context, IConfiguration configuration) =>
             Results.File(
-                Encoding.UTF8.GetBytes(BuildConfig(context, pinAuth)),
+                Encoding.UTF8.GetBytes(BuildConfig(context, configuration)),
                 "text/plain",
-                "gamestate_integration_streampanel.cfg"));
+                Cs2IntegrationService.FileName));
     }
 
-    private static string BaseUrl(HttpContext context) => $"{context.Request.Scheme}://{context.Request.Host}";
-
-    private static string BuildConfig(HttpContext context, PinAuthService pinAuth)
+    private static IResult Ready(IGameTelemetryService telemetry) => Results.Ok(new
     {
-        var uri = $"{BaseUrl(context)}/integrations/cs2/gsi";
-        // CS2 cannot send custom headers, so the PIN travels in the URL of the generated file.
-        if (pinAuth.PinForGeneratedConfig is { } pin)
+        ok = true,
+        message = "CS2 GSI endpoint is ready. Counter-Strike 2 should POST JSON here.",
+        receivedPayloads = telemetry.ReceivedPayloads,
+        lastUpdateUtc = telemetry.LastUpdateUtc,
+        lastStatus = telemetry.LastStatus
+    });
+
+    /// <summary>
+    /// CS2 posts JSON, sometimes with no Content-Type and occasionally an empty heartbeat.
+    /// A 400 here makes the game stop sending, so empty bodies still count as "we heard you".
+    /// </summary>
+    private static async Task<IResult> Ingest(HttpContext context, IGameTelemetryService telemetry)
+    {
+        string text;
+        try
         {
-            uri += $"?pin={Uri.EscapeDataString(pin)}";
+            using var reader = new StreamReader(context.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
+            text = await reader.ReadToEndAsync(context.RequestAborted);
+        }
+        catch (IOException)
+        {
+            return Results.Text("ok");
         }
 
-        return $$"""
-        "StreamPanel CS2 GSI"
+        if (string.IsNullOrWhiteSpace(text))
         {
-          "uri" "{{uri}}"
-          "timeout" "5.0"
-          "buffer"  "0.1"
-          "throttle" "0.1"
-          "heartbeat" "10.0"
-          "data"
-          {
-            "provider" "1"
-            "map" "1"
-            "round" "1"
-            "player_id" "1"
-            "player_state" "1"
-            "player_weapons" "1"
-          }
+            telemetry.UpdateFromCounterStrike(JsonDocument.Parse("{}").RootElement.Clone());
+            return Results.Text("ok");
         }
-        """;
+
+        try
+        {
+            using var payload = JsonDocument.Parse(text);
+            telemetry.UpdateFromCounterStrike(payload.RootElement.Clone());
+            return Results.Text("ok");
+        }
+        catch (JsonException)
+        {
+            return Results.BadRequest("invalid_json");
+        }
+    }
+
+    private static IResult ResultOf(Cs2InstallResult result) =>
+        Results.Json(
+            new { ok = result.Ok, code = result.Code, message = result.Message, path = result.FilePath },
+            statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Code == "cs2_not_found" ? StatusCodes.Status404NotFound
+                : StatusCodes.Status500InternalServerError);
+
+    /// <summary>Counter-Strike runs on this PC, so it always talks to loopback (and never needs a PIN header).</summary>
+    public static string LocalGsiUri(IConfiguration configuration)
+    {
+        var port = configuration.GetValue("StreamPanel:Port", 17820);
+        return Cs2IntegrationService.LocalGsiUri(port);
+    }
+
+    private static string BuildConfig(HttpContext context, IConfiguration configuration)
+    {
+        if (ClientAddress.IsLocal(context))
+        {
+            return Cs2IntegrationService.BuildConfig(LocalGsiUri(configuration));
+        }
+
+        // Asked from another device: it will be copied to the gaming PC by hand. CS2 cannot send headers,
+        // so the generated file points at the short /gsi path (PIN is not required on that POST).
+        var host = context.Request.Host.Host;
+        var port = configuration.GetValue("StreamPanel:Port", 17820);
+        return Cs2IntegrationService.BuildConfig($"http://{host}:{port}{Cs2IntegrationService.GsiPath}");
     }
 }

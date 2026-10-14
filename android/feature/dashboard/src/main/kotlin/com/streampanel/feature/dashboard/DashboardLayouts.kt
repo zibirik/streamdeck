@@ -708,6 +708,9 @@ private fun DashboardPanel(id: DashboardPanelId, state: DashboardUiState, callba
             settings = state.gameOverlaySettings,
             gameInfo = state.gameInfo,
             onOpenSettings = callbacks.onOpenSettings,
+            integration = state.cs2Integration,
+            onInstallIntegration = callbacks.onInstallCs2,
+            pcConnected = state.connectionStatus is ConnectionStatus.Connected,
         )
         DashboardPanelId.PcConfigurator -> PcConfiguratorPanel(
             url = state.pcConfiguratorUrl,
@@ -858,4 +861,5 @@ data class DashboardCallbacks(
     val onWifiRestart: () -> Unit,
     val onFlushDns: () -> Unit,
     val onEmptyRecycleBin: () -> Unit,
+    val onInstallCs2: () -> Unit,
 )

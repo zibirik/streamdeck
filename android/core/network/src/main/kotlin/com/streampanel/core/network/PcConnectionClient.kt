@@ -7,6 +7,8 @@ import io.ktor.websocket.WebSocketSession
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import io.ktor.websocket.send
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -24,8 +26,11 @@ interface PcConnectionClient {
     suspend fun connect(url: String)
     /** Closes the connection. A non-null [failureMessage] is shown as a connection error instead of plain "disconnected". */
     suspend fun disconnect(failureMessage: String? = null)
-    suspend fun send(command: PcCommand): PcCommandResponse
+    suspend fun send(command: PcCommand, timeoutMs: Long = DEFAULT_COMMAND_TIMEOUT_MS): PcCommandResponse
 }
+
+/** Most commands finish at once; programs the PC runs for us (git, docker) pass a longer one. */
+const val DEFAULT_COMMAND_TIMEOUT_MS = 8_000L
 
 @Singleton
 class KtorPcConnectionClient @Inject constructor(
@@ -61,7 +66,7 @@ class KtorPcConnectionClient @Inject constructor(
         _status.value = failureMessage?.let { ConnectionStatus.Failed(it) } ?: ConnectionStatus.Disconnected
     }
 
-    override suspend fun send(command: PcCommand): PcCommandResponse = mutex.withLock {
+    override suspend fun send(command: PcCommand, timeoutMs: Long): PcCommandResponse = mutex.withLock {
         val activeSession = session
             ?: return@withLock PcCommandResponse(
                 id = command.id,
@@ -72,9 +77,17 @@ class KtorPcConnectionClient @Inject constructor(
 
         return@withLock try {
             activeSession.send(Frame.Text(json.encodeToString(command)))
-            val responseFrame = withTimeout(5_000) { activeSession.incoming.receive() }
-            val responseText = (responseFrame as? Frame.Text)?.readText().orEmpty()
-            json.decodeFromString<PcCommandResponse>(responseText)
+            withTimeout(timeoutMs) { receiveResponseFor(activeSession, command.id) }
+        } catch (timeout: TimeoutCancellationException) {
+            // A slow command is not a broken connection. Its late answer is skipped by id next time.
+            PcCommandResponse(
+                id = command.id,
+                ok = false,
+                message = "The PC did not answer in time",
+                completedAtEpochMs = System.currentTimeMillis(),
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (throwable: Throwable) {
             _status.value = ConnectionStatus.Failed(throwable.message ?: "Command failed")
             PcCommandResponse(
@@ -83,6 +96,15 @@ class KtorPcConnectionClient @Inject constructor(
                 message = throwable.message ?: "Command failed",
                 completedAtEpochMs = System.currentTimeMillis(),
             )
+        }
+    }
+
+    /** Reads answers until the one for [id]; answers to earlier commands that timed out are thrown away. */
+    private suspend fun receiveResponseFor(session: WebSocketSession, id: String): PcCommandResponse {
+        while (true) {
+            val text = (session.incoming.receive() as? Frame.Text)?.readText() ?: continue
+            val response = json.decodeFromString<PcCommandResponse>(text)
+            if (response.id == id) return response
         }
     }
 }
