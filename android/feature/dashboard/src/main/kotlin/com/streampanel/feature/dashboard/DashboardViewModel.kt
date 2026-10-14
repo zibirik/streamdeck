@@ -461,7 +461,7 @@ class DashboardViewModel @Inject constructor(
     private fun refreshPcStatus() {
         viewModelScope.launch {
             val settings = preferencesDataSource.serverConnection.first()
-            pcStatusClient.fetch(settings.host, settings.port)?.let { status ->
+            pcStatusClient.fetch(settings.host, settings.port, settings.pin)?.let { status ->
                 status.volumePercent?.toFloat()?.let { volumeDraft.value = it }
                 status.muted?.let { isMuted.value = it }
                 status.micMuted?.let { isMicMuted.value = it }

@@ -1,7 +1,6 @@
 package com.streampanel.core.database
 
 import android.content.Context
-import android.util.Log
 import androidx.room.Room
 import dagger.Binds
 import dagger.Module
@@ -12,7 +11,6 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 private const val DB_NAME = "stream-panel-v2.db"
-private const val TAG = "StreamPanelDB"
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -30,23 +28,17 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): StreamPanelDatabase {
-        fun build() = Room.databaseBuilder(
+        // Every released schema version (1..3) has a migration, so user decks are never wiped on upgrade.
+        // Room only opens the file lazily, so a try/catch around build() could never detect corruption anyway.
+        // Only a downgrade (installing an older APK over a newer one) is allowed to reset the data.
+        return Room.databaseBuilder(
             context,
             StreamPanelDatabase::class.java,
             DB_NAME,
         )
             .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
-            .fallbackToDestructiveMigration()
+            .fallbackToDestructiveMigrationOnDowngrade()
             .build()
-
-        return try {
-            build()
-        } catch (error: Exception) {
-            Log.e(TAG, "Database open failed, recreating", error)
-            context.deleteDatabase(DB_NAME)
-            context.deleteDatabase("stream-panel.db")
-            build()
-        }
     }
 
     @Provides

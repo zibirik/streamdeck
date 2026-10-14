@@ -1,0 +1,30 @@
+name: Commercial license request
+description: Ask for a commercial license (company, client work, monetised use, redistribution)
+labels: [commercial]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        StreamPanel is free for noncommercial use. See [COMMERCIAL.md](https://github.com/zibirik/streamdeck/blob/main/COMMERCIAL.md) for what needs a commercial license.
+        Do not post private contact data in a public issue; say how you would like to be contacted instead.
+  - type: input
+    id: who
+    attributes:
+      label: Company / project
+    validations:
+      required: true
+  - type: textarea
+    id: usage
+    attributes:
+      label: How do you want to use StreamPanel?
+    validations:
+      required: true
+  - type: input
+    id: scale
+    attributes:
+      label: Number of PCs / tablets
+  - type: input
+    id: contact
+    attributes:
+      label: Preferred contact method
+      placeholder: "e.g. reply in this issue / Telegram handle"

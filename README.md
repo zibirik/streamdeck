@@ -12,14 +12,15 @@ Stream · Work · Study · Gaming · Automation · Smart Home — all from one g
 
 <br/>
 
+[![Release](https://img.shields.io/github/v/release/zibirik/streamdeck?include_prereleases&style=for-the-badge&color=8b5cf6)](https://github.com/zibirik/streamdeck/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/zibirik/streamdeck/ci.yml?style=for-the-badge&label=CI)](https://github.com/zibirik/streamdeck/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-blue?style=for-the-badge)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com/)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.x-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org/)
-[![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
-[![.NET](https://img.shields.io/badge/.NET%208-Windows%20Server-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![Version](https://img.shields.io/badge/version-0.1.15-8b5cf6?style=for-the-badge)](android/app/build.gradle.kts)
-[![License](https://img.shields.io/badge/license-TBD-slate?style=for-the-badge)](#license)
+[![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 
-[Quick Start](#-quick-start) · [Features](#-features) · [Screenshots](#-screenshots) · [Architecture](#-architecture) · [Docs](#-documentation) · [Русский](README.ru.md)
+### [⬇ Download the latest release](https://github.com/zibirik/streamdeck/releases/latest)
+
+[Install](#-install) · [Features](#-features) · [Screenshots](#-screenshots) · [Security](#-security) · [Build from source](#-build-from-source) · [License](#-license--commercial-use) · [Русский](README.ru.md)
 
 </div>
 
@@ -32,7 +33,7 @@ StreamPanel is a **two-part system**:
 | Part | Role |
 |------|------|
 | **Android app** | Beautiful tablet UI — button deck, widgets, OBS room, macros |
-| **Windows server** | Companion on your PC — executes commands, sends live telemetry |
+| **Windows server** | Small companion on your PC — executes commands, sends live telemetry |
 
 Press a button on the tablet → your PC opens apps, sends hotkeys, switches OBS scenes, snaps windows, or runs a full macro chain.
 
@@ -56,7 +57,39 @@ flowchart TB
     Server --> Win
 ```
 
-> **Two connections, not one:** PC server uses port **17820**. OBS uses its own WebSocket on port **4455**.
+> **Two connections, not one:** the PC server uses port **17820**. OBS uses its own WebSocket on port **4455**.
+
+---
+
+## Install
+
+You do **not** need Android Studio, .NET or any developer tools. Everything is on the
+[Releases page](https://github.com/zibirik/streamdeck/releases/latest).
+
+| File | Where | What it is |
+|------|-------|------------|
+| `StreamPanel-Server-vX.Y.Z-win-x64.zip` | Windows 10/11 PC | The companion server (self-contained, nothing else to install) |
+| `StreamPanel-vX.Y.Z.apk` | Android 8.0+ tablet or phone | The app |
+| `SHA256SUMS.txt` | — | Checksums to verify your downloads |
+
+### 1 · On the PC
+
+1. Download and unzip `StreamPanel-Server-…-win-x64.zip`.
+2. **Set a PIN** — open `appsettings.json`, set `"Pin": "your-pin"` (see [Security](#-security)).
+3. Run `START-SERVER.bat`. Allow the Windows firewall prompt (or run `ALLOW-FIREWALL.bat` as administrator).
+4. The console shows your PC's addresses, e.g. `ws://192.168.1.76:17820/ws`.
+
+### 2 · On the tablet
+
+1. Download `StreamPanel-…apk` to the tablet and open it (allow "install unknown apps" for your browser/file manager once).
+2. Open StreamPanel → **Settings** → enter your PC's IP address, port `17820` and the **same PIN**.
+3. Tap a button on the deck — your PC reacts.
+
+Both devices must be on the **same Wi‑Fi network**. Updating later = install the new APK over the old one and replace the server folder
+(keep your `appsettings.json`).
+
+> **Windows SmartScreen** may warn about an unsigned executable the first time ("More info" → "Run anyway").
+> You can compare the file against `SHA256SUMS.txt`, or [build it yourself](#-build-from-source).
 
 ---
 
@@ -150,47 +183,116 @@ flowchart TB
 
 ---
 
-## Quick Start
+## Security
 
-### For users (share with a friend)
+The server can run actions on your PC (launch programs, send keystrokes, manage windows), so please read this once.
 
-```powershell
-.\tools\package-friend-bundle.ps1
-```
+- **Set a PIN.** Windows: `appsettings.json` → `"StreamPanel": { "Pin": "your-pin" }`, restart the server. Tablet: Settings → PIN code → same value.
+  Without a PIN, **anyone on your Wi‑Fi can control your PC** (the server console prints a warning).
+- With a PIN, every remote connection must authenticate first; `/status`, `/api/configurator/*` and `/integrations/*` require it as well;
+  5 wrong attempts lock that IP out for a minute. Requests from the PC itself are always allowed.
+- `OPEN_URL` accepts only allow‑listed schemes (`http`, `https`, `steam`, `spotify`, `discord`, …) — configurable in `appsettings.json`.
+- Traffic is plain HTTP/WebSocket on your local network. Use a network you trust and **never forward port 17820 to the internet**
+  (use a VPN for remote access).
+- Found a vulnerability? Please report it privately — see [`SECURITY.md`](SECURITY.md).
 
-Output: `dist\StreamPanel-FriendBundle.zip` (~93 MB)
+## Privacy
 
-| On PC | On tablet |
-|-------|-----------|
-| Unzip → run `START-SERVER.bat` | Install `StreamPanel.apk` |
-| Allow firewall if asked | Settings → PC host = your PC IP |
-| Port **17820** | Port **17820** |
-
-Both devices must be on the **same Wi‑Fi network**.
+StreamPanel has **no accounts, no analytics and no telemetry**. Your deck and settings stay on your devices. The tablet talks only to
+your own PC and to the services *you* configure (OBS, Spotify, Hue, Home Assistant, …). Tokens and the PIN are stored on the tablet
+and excluded from Android backups.
 
 ---
 
-### For developers
+## Windows server API
+
+Default port: **17820** (change it with `StreamPanel:Port`).
+
+| Endpoint | Description | PIN |
+|----------|-------------|-----|
+| `GET /api` | Name, version, machine name, `pinRequired` (used for LAN discovery) | no |
+| `GET /` | PC Configurator web UI | no (API calls need it) |
+| `GET /status` | Live PC telemetry | yes |
+| `WS /ws` | Command channel from tablet | yes (`auth` command) |
+| `POST /integrations/cs2/gsi` | Counter-Strike 2 GSI | yes (`?pin=`) |
+| `GET/POST /api/configurator/draft` | Web configurator drafts | yes |
+
+Protocol details: [`docs/protocol.md`](docs/protocol.md)
+
+---
+
+## OBS setup
+
+1. OBS → **Tools → WebSocket Server Settings**
+2. Enable server, set password (default port **4455**)
+3. In StreamPanel → **OBS Studio**:
+   - URL: `ws://YOUR_PC_IP:4455`
+   - Password: your OBS password
+
+No need to start streaming manually before connecting — WebSocket works as soon as OBS is open.
+
+---
+
+## Troubleshooting
+
+<details>
+<summary><b>Tablet can't connect to PC</b></summary>
+
+- Server running? (`START-SERVER.bat`)
+- Correct PC IP? (`ipconfig` → Wi‑Fi IPv4). Open `http://PC_IP:17820/api` in the tablet's browser — you should see JSON.
+- Firewall open? (`ALLOW-FIREWALL.bat` as administrator)
+- Same Wi‑Fi network, no "client isolation" on the router, no VPN active on either device
+- PIN identical on both sides? A wrong PIN shows as a connection error in the app.
+
+</details>
+
+<details>
+<summary><b>OBS says wrong stream key / channel error</b></summary>
+
+StreamPanel **did connect** — OBS tried to start the stream but rejected your stream settings.
+
+Fix in OBS: **Settings → Stream** (service, server, stream key).
+
+</details>
+
+<details>
+<summary><b>CS2 HUD not updating</b></summary>
+
+1. Download the GSI config from `http://PC_IP:17820/` → CS2 HUD tab (it already contains your PIN)
+2. Place it in `csgo/cfg/`
+3. Restart CS2
+4. Check `http://PC_IP:17820/integrations/cs2/status`
+
+</details>
+
+---
+
+## Build from source
+
+Requirements: Windows, .NET 8 SDK (or newer), JDK 17, Android SDK (platform 35).
 
 ```powershell
 git clone https://github.com/zibirik/streamdeck.git
 cd streamdeck
 .\tools\check-prereqs.ps1
-.\tools\build-all.ps1
-.\tools\run-server.ps1
+.\tools\test-server.ps1        # server unit tests
+.\tools\build-android.ps1      # debug APK → android\app\build\outputs\apk\debug\
+.\tools\run-server.ps1         # run the server locally
 ```
 
-Install APK:
+| Command | Result |
+|---------|--------|
+| `.\tools\build-all.ps1` | Tests + server + APK |
+| `.\tools\build-android.ps1` | Debug APK only |
+| `.\tools\test-server.ps1` | Server unit tests |
+| `.\tools\run-server.ps1` | Start the server locally |
+| `.\tools\package-release.ps1 -Version 1.0.0` | Release files in `dist\release\` |
+| `.\tools\create-keystore.ps1` | One-time Android signing key for releases |
 
-```text
-android\app\build\outputs\apk\debug\app-debug.apk
-```
+If PowerShell refuses to run scripts: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+Maintainers: see [`docs/releasing.md`](docs/releasing.md) for how releases are published.
 
-Full checklist: [`docs/ready-checklist-ru.md`](docs/ready-checklist-ru.md) (RU)
-
----
-
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart LR
@@ -213,96 +315,14 @@ flowchart LR
 | Windows server | .NET 8, ASP.NET Core Minimal APIs |
 | Protocol | JSON over WebSocket v1 |
 
-Deep dive: [`docs/architecture.md`](docs/architecture.md)
-
----
-
-## Repository structure
-
 ```text
 streamdeck/
-├── android/                 # Kotlin tablet app
-│   ├── app/                 # Entry, navigation
-│   ├── core/                # model, database, network, execution…
-│   └── feature/             # dashboard, editor, settings, obs…
-├── server/windows/          # .NET companion server
-├── tools/                   # Build & deploy scripts (PowerShell)
-├── docs/                    # Architecture, protocol, images
-└── dist/                    # Build output (gitignored)
+├── android/                 # Kotlin tablet app (app, core/*, feature/*)
+├── server/windows/          # .NET companion server + unit tests
+├── tools/                   # Build, test & release scripts (PowerShell)
+├── docs/                    # Architecture, protocol, releasing, images
+└── .github/                 # CI and release workflows, issue templates
 ```
-
----
-
-## Windows server API
-
-Default port: **17820**
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /` | PC Configurator web UI |
-| `GET /status` | Live PC telemetry |
-| `WS /ws` | Command channel from tablet |
-| `POST /integrations/cs2/gsi` | Counter-Strike 2 GSI |
-| `GET/POST /api/configurator/draft` | Web configurator drafts |
-
-Protocol details: [`docs/protocol.md`](docs/protocol.md)
-
----
-
-## OBS setup
-
-1. OBS → **Tools → WebSocket Server Settings**
-2. Enable server, set password (default port **4455**)
-3. In StreamPanel → **OBS Studio**:
-   - URL: `ws://YOUR_PC_IP:4455`
-   - Password: your OBS password
-
-No need to start streaming manually before connecting — WebSocket works as soon as OBS is open.
-
----
-
-## Build commands
-
-| Command | Result |
-|---------|--------|
-| `.\tools\build-all.ps1` | Server + APK + friend bundle |
-| `.\tools\build-android.ps1` | Debug APK only |
-| `.\tools\build-server.ps1` | Server build |
-| `.\tools\package-friend-bundle.ps1` | ZIP for sharing |
-| `.\tools\run-server.ps1` | Start server locally |
-
----
-
-## Troubleshooting
-
-<details>
-<summary><b>Tablet can't connect to PC</b></summary>
-
-- Server running? (`START-SERVER.bat` or `run-server.ps1`)
-- Correct PC IP? (`ipconfig` → Wi‑Fi IPv4)
-- Firewall open? (`ALLOW-FIREWALL.bat`)
-- Same Wi‑Fi network, no client isolation on router
-
-</details>
-
-<details>
-<summary><b>OBS says wrong stream key / channel error</b></summary>
-
-StreamPanel **did connect** — OBS tried to start the stream but rejected your stream settings.
-
-Fix in OBS: **Settings → Stream** (service, server, stream key).
-
-</details>
-
-<details>
-<summary><b>CS2 HUD not updating</b></summary>
-
-1. Download GSI config from `http://PC_IP:17820/` → CS2 HUD tab
-2. Place in `csgo/cfg/`
-3. Restart CS2
-4. Check `http://PC_IP:17820/integrations/cs2/status`
-
-</details>
 
 ---
 
@@ -311,26 +331,35 @@ Fix in OBS: **Settings → Stream** (service, server, stream key).
 | File | Content |
 |------|---------|
 | [`docs/architecture.md`](docs/architecture.md) | System design |
-| [`docs/protocol.md`](docs/protocol.md) | WebSocket protocol |
+| [`docs/protocol.md`](docs/protocol.md) | WebSocket protocol, authentication, limits |
 | [`docs/plugin-sdk.md`](docs/plugin-sdk.md) | Plugin contracts |
+| [`docs/releasing.md`](docs/releasing.md) | How releases are built and published |
 | [`docs/roadmap.md`](docs/roadmap.md) | Roadmap stages |
-| [`README.ru.md`](README.ru.md) | Russian README |
+| [`CHANGELOG.md`](CHANGELOG.md) | What changed in each version |
 
 ---
 
-## Contributing
+## Contributing & support
 
-1. Fork the repo
-2. Create a feature branch
-3. Run `.\tools\build-all.ps1`
-4. Test on a real tablet + Windows PC
-5. Open a pull request
+- Bugs and ideas: [open an issue](https://github.com/zibirik/streamdeck/issues/new/choose).
+- Pull requests are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md) (please read the contribution terms).
+- Security reports: [`SECURITY.md`](SECURITY.md).
 
 ---
 
-## License
+## License & commercial use
 
-License not specified yet. Add a `LICENSE` file before public distribution.
+StreamPanel is **source-available** under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+
+| You are… | Cost |
+|----------|------|
+| An individual using it for yourself, hobby, study or research | **Free** |
+| A school, charity or public institution | **Free** |
+| A company, studio or agency; client work; business / monetised use; reselling or embedding it | **Commercial license required** — see [`COMMERCIAL.md`](COMMERCIAL.md) |
+
+Not sure? [Ask in an issue](https://github.com/zibirik/streamdeck/issues/new/choose).
+Third-party software and trademarks: [`NOTICE.md`](NOTICE.md). StreamPanel is independent and not affiliated with Elgato/Corsair
+("Stream Deck" is their trademark), OBS, Spotify, Discord, Valve or any other mentioned brand.
 
 ---
 

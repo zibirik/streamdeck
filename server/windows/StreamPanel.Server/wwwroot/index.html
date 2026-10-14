@@ -371,6 +371,24 @@
   </main>
 
   <script>
+    // The server may require a PIN for remote browsers (the PC itself never needs it).
+    function savedPin() { return localStorage.getItem('streampanel.pin') || ''; }
+    async function api(url, options = {}) {
+      const send = () => fetch(url, {
+        ...options,
+        headers: { ...(options.headers || {}), 'X-StreamPanel-Pin': savedPin() }
+      });
+      let response = await send();
+      if (response.status === 401) {
+        const pin = window.prompt('StreamPanel PIN');
+        if (pin === null) return response;
+        localStorage.setItem('streampanel.pin', pin);
+        response = await send();
+        if (response.status === 401) localStorage.removeItem('streampanel.pin');
+      }
+      return response;
+    }
+
     const state = {
       status: null,
       deckDraft: JSON.parse(localStorage.getItem('streampanel.deckDraft') || '[]'),
@@ -422,10 +440,12 @@
     }
 
     async function refreshAll() {
-      const status = await fetch('/status').then(r => r.json());
+      const statusResponse = await api('/status');
+      if (!statusResponse.ok) return;
+      const status = await statusResponse.json();
       state.status = status;
-      const cs2 = await fetch('/integrations/cs2/status').then(r => r.json()).catch(() => null);
-      const cfg = await fetch('/integrations/cs2/config').then(r => r.text()).catch(() => '');
+      const cs2 = await api('/integrations/cs2/status').then(r => r.json()).catch(() => null);
+      const cfg = await api('/integrations/cs2/config').then(r => r.text()).catch(() => '');
       const host = location.host;
 
       document.getElementById('summary').innerHTML = [
@@ -630,7 +650,7 @@
     }
 
     async function loadServerDraft() {
-      const draft = await fetch('/api/configurator/draft').then(r => r.json()).catch(() => null);
+      const draft = await api('/api/configurator/draft').then(r => r.ok ? r.json() : null).catch(() => null);
       if (!draft) return;
       state.deckDraft = draft.buttons || state.deckDraft;
       state.macros = draft.macros || [];
@@ -641,13 +661,21 @@
     }
 
     async function saveServerDraft() {
-      await fetch('/api/configurator/draft', {
+      await api('/api/configurator/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(serverDraft(), null, 2)
       }).catch(() => null);
       exportDeckDraft();
     }
+
+    document.addEventListener('click', event => {
+      const link = event.target.closest && event.target.closest('a[href="/integrations/cs2/download-config"]');
+      if (link && savedPin()) {
+        event.preventDefault();
+        location.href = '/integrations/cs2/download-config?pin=' + encodeURIComponent(savedPin());
+      }
+    });
 
     loadServerDraft().then(refreshAll);
     setInterval(refreshAll, 5000);

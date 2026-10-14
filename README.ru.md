@@ -12,14 +12,15 @@
 
 <br/>
 
+[![Release](https://img.shields.io/github/v/release/zibirik/streamdeck?include_prereleases&style=for-the-badge&color=8b5cf6)](https://github.com/zibirik/streamdeck/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/zibirik/streamdeck/ci.yml?style=for-the-badge&label=CI)](https://github.com/zibirik/streamdeck/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-blue?style=for-the-badge)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com/)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.x-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org/)
-[![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
-[![.NET](https://img.shields.io/badge/.NET%208-Windows%20Server-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![Version](https://img.shields.io/badge/версия-0.1.15-8b5cf6?style=for-the-badge)](android/app/build.gradle.kts)
-[![License](https://img.shields.io/badge/license-TBD-slate?style=for-the-badge)](#лицензия)
+[![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 
-[Быстрый старт](#-быстрый-старт) · [Функции](#-функции) · [Скриншоты](#-скриншоты) · [Архитектура](#-архитектура) · [Документация](#-документация) · [English](README.md)
+### [⬇ Скачать последнюю версию](https://github.com/zibirik/streamdeck/releases/latest)
+
+[Установка](#установка) · [Функции](#функции) · [Скриншоты](#скриншоты) · [Безопасность](#безопасность) · [Сборка из исходников](#сборка-из-исходников) · [Лицензия](#лицензия-и-коммерческое-использование) · [English](README.md)
 
 </div>
 
@@ -32,7 +33,7 @@ StreamPanel — это **две части**, которые работают в
 | Компонент | Роль |
 |-----------|------|
 | **Android-приложение** | Красивый UI на планшете — deck, виджеты, OBS room, макросы |
-| **Windows server** | Companion на ПК — выполняет команды, отдаёт telemetry |
+| **Windows server** | Небольшая программа на ПК — выполняет команды, отдаёт telemetry |
 
 Нажал кнопку на планшете → ПК открывает программы, шлёт hotkeys, переключает сцены OBS, расставляет окна или запускает цепочку макросов.
 
@@ -57,6 +58,38 @@ flowchart TB
 ```
 
 > **Два подключения, не одно:** PC server — порт **17820**. OBS — свой WebSocket на порту **4455**.
+
+---
+
+## Установка
+
+Android Studio, .NET и другие инструменты разработчика **не нужны**. Всё лежит на странице
+[Releases](https://github.com/zibirik/streamdeck/releases/latest).
+
+| Файл | Куда | Что это |
+|------|------|---------|
+| `StreamPanel-Server-vX.Y.Z-win-x64.zip` | ПК с Windows 10/11 | Сервер (всё внутри, ничего ставить не нужно) |
+| `StreamPanel-vX.Y.Z.apk` | Планшет/телефон Android 8.0+ | Приложение |
+| `SHA256SUMS.txt` | — | Контрольные суммы для проверки загрузок |
+
+### 1 · На ПК
+
+1. Скачай и распакуй `StreamPanel-Server-…-win-x64.zip`.
+2. **Задай PIN** — открой `appsettings.json`, укажи `"Pin": "твой-пин"` (см. [Безопасность](#безопасность)).
+3. Запусти `START-SERVER.bat`. Разреши доступ в брандмауэре (или запусти `ALLOW-FIREWALL.bat` от администратора).
+4. В консоли появятся адреса ПК, например `ws://192.168.1.76:17820/ws`.
+
+### 2 · На планшете
+
+1. Скачай `StreamPanel-…apk` на планшет и открой его (один раз разреши «установку из неизвестных источников» для браузера/файлового менеджера).
+2. Открой StreamPanel → **Настройки** → введи IP ПК, порт `17820` и **тот же PIN**.
+3. Нажми кнопку на деке — ПК отреагирует.
+
+Оба устройства должны быть в **одной Wi‑Fi сети**. Обновление: установи новый APK поверх старого и замени папку сервера
+(свой `appsettings.json` сохрани).
+
+> **Windows SmartScreen** может предупредить о неподписанной программе при первом запуске («Подробнее» → «Выполнить в любом случае»).
+> Можно сверить файл с `SHA256SUMS.txt` или [собрать самому](#сборка-из-исходников).
 
 ---
 
@@ -150,47 +183,116 @@ flowchart TB
 
 ---
 
-## Быстрый старт
+## Безопасность
 
-### Для пользователя (отправить другу)
+Сервер умеет выполнять действия на ПК (запуск программ, ввод с клавиатуры, управление окнами), поэтому прочитай это один раз.
 
-```powershell
-.\tools\package-friend-bundle.ps1
-```
+- **Задай PIN.** Windows: `appsettings.json` → `"StreamPanel": { "Pin": "твой-пин" }`, перезапусти сервер. Планшет: Настройки → PIN-код → то же значение.
+  Без PIN **любой в твоей Wi‑Fi сети может управлять ПК** (в консоли сервера будет предупреждение).
+- С PIN каждое удалённое подключение сначала авторизуется; `/status`, `/api/configurator/*` и `/integrations/*` тоже требуют PIN;
+  после 5 неверных попыток IP блокируется на минуту. Запросы с самого ПК всегда разрешены.
+- `OPEN_URL` принимает только разрешённые схемы (`http`, `https`, `steam`, `spotify`, `discord`, …) — список в `appsettings.json`.
+- Трафик идёт по обычному HTTP/WebSocket внутри локальной сети. Используй доверенную сеть и **никогда не пробрасывай порт 17820 в интернет**
+  (для удалённого доступа — VPN).
+- Нашёл уязвимость? Сообщи приватно — см. [`SECURITY.md`](SECURITY.md).
 
-Результат: `dist\StreamPanel-FriendBundle.zip` (~93 МБ)
+## Приватность
 
-| На ПК | На планшете |
-|-------|-------------|
-| Распаковать → `START-SERVER.bat` | Установить `StreamPanel.apk` |
-| Разрешить firewall | Настройки → IP ПК |
-| Порт **17820** | Порт **17820** |
-
-Оба устройства — в **одной Wi‑Fi сети**.
+В StreamPanel **нет аккаунтов, аналитики и телеметрии**. Deck и настройки остаются на твоих устройствах. Планшет общается только
+с твоим ПК и с сервисами, которые *ты* настроил (OBS, Spotify, Hue, Home Assistant, …). Токены и PIN хранятся на планшете и
+исключены из резервных копий Android.
 
 ---
 
-### Для разработчика
+## Windows server API
+
+Порт по умолчанию: **17820** (меняется через `StreamPanel:Port`).
+
+| Endpoint | Описание | PIN |
+|----------|----------|-----|
+| `GET /api` | Имя, версия, имя ПК, `pinRequired` (для поиска в сети) | нет |
+| `GET /` | PC Configurator (веб UI) | нет (запросы к API — да) |
+| `GET /status` | Live telemetry ПК | да |
+| `WS /ws` | Команды с планшета | да (команда `auth`) |
+| `POST /integrations/cs2/gsi` | Counter-Strike 2 GSI | да (`?pin=`) |
+| `GET/POST /api/configurator/draft` | Draft веб-конфигуратора | да |
+
+Протокол: [`docs/protocol.md`](docs/protocol.md)
+
+---
+
+## Настройка OBS
+
+1. OBS → **Tools → WebSocket Server Settings**
+2. Включить server, задать пароль (порт **4455**)
+3. В StreamPanel → **OBS Studio**:
+   - URL: `ws://IP_ПК:4455`
+   - Password: пароль OBS
+
+Трансляцию вручную начинать не нужно — WebSocket работает, пока OBS открыт.
+
+---
+
+## Troubleshooting
+
+<details>
+<summary><b>Планшет не подключается к ПК</b></summary>
+
+- Server запущен? (`START-SERVER.bat`)
+- Верный IP? (`ipconfig` → Wi‑Fi IPv4). Открой в браузере планшета `http://IP_ПК:17820/api` — должен показаться JSON.
+- Firewall? (`ALLOW-FIREWALL.bat` от администратора)
+- Одна Wi‑Fi сеть, без client isolation на роутере, без включённого VPN на обоих устройствах
+- PIN одинаковый с обеих сторон? Неверный PIN показывается в приложении как ошибка подключения.
+
+</details>
+
+<details>
+<summary><b>OBS пишет ошибку ключа / канала</b></summary>
+
+StreamPanel **подключился** — OBS попытался начать эфир, но отклонил настройки трансляции.
+
+Исправь в OBS: **Settings → Stream** (сервис, server, stream key).
+
+</details>
+
+<details>
+<summary><b>CS2 HUD не обновляется</b></summary>
+
+1. Скачай GSI config: `http://IP_ПК:17820/` → вкладка CS2 HUD (PIN уже внутри файла)
+2. Положи в `csgo/cfg/`
+3. Перезапусти CS2
+4. Проверь `http://IP_ПК:17820/integrations/cs2/status`
+
+</details>
+
+---
+
+## Сборка из исходников
+
+Нужно: Windows, .NET 8 SDK (или новее), JDK 17, Android SDK (platform 35).
 
 ```powershell
 git clone https://github.com/zibirik/streamdeck.git
 cd streamdeck
 .\tools\check-prereqs.ps1
-.\tools\build-all.ps1
-.\tools\run-server.ps1
+.\tools\test-server.ps1        # unit-тесты сервера
+.\tools\build-android.ps1      # debug APK → android\app\build\outputs\apk\debug\
+.\tools\run-server.ps1         # запуск сервера
 ```
 
-APK:
+| Команда | Результат |
+|---------|-----------|
+| `.\tools\build-all.ps1` | Тесты + server + APK |
+| `.\tools\build-android.ps1` | Только debug APK |
+| `.\tools\test-server.ps1` | Тесты сервера |
+| `.\tools\run-server.ps1` | Запуск server локально |
+| `.\tools\package-release.ps1 -Version 1.0.0` | Файлы релиза в `dist\release\` |
+| `.\tools\create-keystore.ps1` | Одноразовый ключ подписи Android для релизов |
 
-```text
-android\app\build\outputs\apk\debug\app-debug.apk
-```
+Если PowerShell не запускает скрипты: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+Для мейнтейнеров: как публикуются релизы — [`docs/releasing.md`](docs/releasing.md).
 
-Полный чеклист: [`docs/ready-checklist-ru.md`](docs/ready-checklist-ru.md)
-
----
-
-## Архитектура
+### Архитектура
 
 ```mermaid
 flowchart LR
@@ -213,96 +315,14 @@ flowchart LR
 | Windows server | .NET 8, ASP.NET Core Minimal APIs |
 | Протокол | JSON over WebSocket v1 |
 
-Подробнее: [`docs/architecture.md`](docs/architecture.md)
-
----
-
-## Структура репозитория
-
 ```text
 streamdeck/
-├── android/                 # Kotlin tablet app
-│   ├── app/                 # Entry, navigation
-│   ├── core/                # model, database, network, execution…
-│   └── feature/             # dashboard, editor, settings, obs…
-├── server/windows/          # .NET companion server
-├── tools/                   # PowerShell build scripts
-├── docs/                    # Architecture, protocol, images
-└── dist/                    # Build output (gitignored)
+├── android/                 # Kotlin tablet app (app, core/*, feature/*)
+├── server/windows/          # .NET companion server + unit-тесты
+├── tools/                   # Скрипты сборки, тестов и релиза (PowerShell)
+├── docs/                    # Архитектура, протокол, релизы, картинки
+└── .github/                 # CI, release workflow, шаблоны issue
 ```
-
----
-
-## Windows server API
-
-Порт по умолчанию: **17820**
-
-| Endpoint | Описание |
-|----------|----------|
-| `GET /` | PC Configurator (веб UI) |
-| `GET /status` | Live telemetry ПК |
-| `WS /ws` | Команды с планшета |
-| `POST /integrations/cs2/gsi` | Counter-Strike 2 GSI |
-| `GET/POST /api/configurator/draft` | Draft веб-конфигуратора |
-
-Протокол: [`docs/protocol.md`](docs/protocol.md)
-
----
-
-## Настройка OBS
-
-1. OBS → **Tools → WebSocket Server Settings**
-2. Включить server, задать пароль (порт **4455**)
-3. В StreamPanel → **OBS Studio**:
-   - URL: `ws://IP_ПК:4455`
-   - Password: пароль OBS
-
-Трансляцию вручную начинать не нужно — WebSocket работает, пока OBS открыт.
-
----
-
-## Команды сборки
-
-| Команда | Результат |
-|---------|-----------|
-| `.\tools\build-all.ps1` | Server + APK + friend bundle |
-| `.\tools\build-android.ps1` | Только APK |
-| `.\tools\build-server.ps1` | Только server |
-| `.\tools\package-friend-bundle.ps1` | ZIP для друга |
-| `.\tools\run-server.ps1` | Запуск server |
-
----
-
-## Troubleshooting
-
-<details>
-<summary><b>Планшет не подключается к ПК</b></summary>
-
-- Server запущен? (`START-SERVER.bat`)
-- Верный IP? (`ipconfig` → Wi‑Fi IPv4)
-- Firewall? (`ALLOW-FIREWALL.bat`)
-- Одна Wi‑Fi сеть, без client isolation на роутере
-
-</details>
-
-<details>
-<summary><b>OBS пишет ошибку ключа / канала</b></summary>
-
-StreamPanel **подключился** — OBS попытался начать эфир, но отклонил настройки трансляции.
-
-Исправь в OBS: **Settings → Stream** (сервис, server, stream key).
-
-</details>
-
-<details>
-<summary><b>CS2 HUD не обновляется</b></summary>
-
-1. Скачай GSI config: `http://IP_ПК:17820/` → вкладка CS2 HUD
-2. Положи в `csgo/cfg/`
-3. Перезапусти CS2
-4. Проверь `http://IP_ПК:17820/integrations/cs2/status`
-
-</details>
 
 ---
 
@@ -311,27 +331,35 @@ StreamPanel **подключился** — OBS попытался начать �
 | Файл | Содержание |
 |------|------------|
 | [`docs/architecture.md`](docs/architecture.md) | Архитектура |
-| [`docs/protocol.md`](docs/protocol.md) | WebSocket протокол |
+| [`docs/protocol.md`](docs/protocol.md) | WebSocket протокол, авторизация, лимиты |
 | [`docs/plugin-sdk.md`](docs/plugin-sdk.md) | Plugin API |
+| [`docs/releasing.md`](docs/releasing.md) | Как собираются и публикуются релизы |
 | [`docs/roadmap.md`](docs/roadmap.md) | Roadmap |
-| [`docs/ready-checklist-ru.md`](docs/ready-checklist-ru.md) | Чеклист готовности |
-| [`README.md`](README.md) | English README |
+| [`CHANGELOG.md`](CHANGELOG.md) | Что изменилось в каждой версии |
 
 ---
 
-## Contributing
+## Участие и поддержка
 
-1. Fork репозитория
-2. Feature branch
-3. `.\tools\build-all.ps1`
-4. Тест на реальном планшете + Windows PC
-5. Pull request
+- Баги и идеи: [создай issue](https://github.com/zibirik/streamdeck/issues/new/choose).
+- Pull request'ы приветствуются — см. [`CONTRIBUTING.md`](CONTRIBUTING.md) (прочитай условия для контрибьюторов).
+- Уязвимости: [`SECURITY.md`](SECURITY.md).
 
 ---
 
-## Лицензия
+## Лицензия и коммерческое использование
 
-Лицензия пока не указана. Добавь `LICENSE` перед публичным релизом.
+Код StreamPanel **доступен для чтения** по лицензии [PolyForm Noncommercial 1.0.0](LICENSE).
+
+| Кто ты | Стоимость |
+|--------|-----------|
+| Частное лицо: для себя, хобби, учёба, исследования | **Бесплатно** |
+| Школа, благотворительная организация, госучреждение | **Бесплатно** |
+| Компания, студия, агентство; работа для клиентов; бизнес / монетизируемое использование; перепродажа и встраивание | **Нужна коммерческая лицензия** — см. [`COMMERCIAL.md`](COMMERCIAL.md) |
+
+Не уверен? [Спроси в issue](https://github.com/zibirik/streamdeck/issues/new/choose).
+Сторонние компоненты и товарные знаки: [`NOTICE.md`](NOTICE.md). StreamPanel — независимый проект, не связан с Elgato/Corsair
+(«Stream Deck» — их товарный знак), OBS, Spotify, Discord, Valve и другими упомянутыми брендами.
 
 ---
 

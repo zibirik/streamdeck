@@ -22,7 +22,8 @@ import javax.inject.Singleton
 interface PcConnectionClient {
     val status: StateFlow<ConnectionStatus>
     suspend fun connect(url: String)
-    suspend fun disconnect()
+    /** Closes the connection. A non-null [failureMessage] is shown as a connection error instead of plain "disconnected". */
+    suspend fun disconnect(failureMessage: String? = null)
     suspend fun send(command: PcCommand): PcCommandResponse
 }
 
@@ -53,11 +54,11 @@ class KtorPcConnectionClient @Inject constructor(
         }
     }
 
-    override suspend fun disconnect() = mutex.withLock {
+    override suspend fun disconnect(failureMessage: String?) = mutex.withLock {
         session?.close()
         session = null
         currentUrl = null
-        _status.value = ConnectionStatus.Disconnected
+        _status.value = failureMessage?.let { ConnectionStatus.Failed(it) } ?: ConnectionStatus.Disconnected
     }
 
     override suspend fun send(command: PcCommand): PcCommandResponse = mutex.withLock {

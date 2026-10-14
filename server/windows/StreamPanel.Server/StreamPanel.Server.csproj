@@ -6,5 +6,14 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>StreamPanel.Server</AssemblyName>
     <RootNamespace>StreamPanel.Server</RootNamespace>
+    <!-- Default for local builds; release builds pass -p:Version=<tag>. -->
+    <Version>0.2.0</Version>
+    <Company>zibirik</Company>
+    <Product>StreamPanel</Product>
+    <Copyright>Copyright 2026 zibirik</Copyright>
+    <NeutralLanguage>en</NeutralLanguage>
+    <!-- Framework-dependent runs (run-server.ps1) also work when only a newer .NET runtime (e.g. 10) is installed.
+         The release build is self-contained and does not depend on this. -->
+    <RollForward>LatestMajor</RollForward>
   </PropertyGroup>
 </Project>

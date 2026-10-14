@@ -2,7 +2,9 @@ package com.streampanel.core.network
 
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.isSuccess
 import com.streampanel.core.model.GameTelemetryInfo
 import com.streampanel.core.model.PcProcessInfo
 import com.streampanel.core.model.PcStorageDrive
@@ -39,8 +41,12 @@ class PcStatusClient @Inject constructor(
     private val httpClient: HttpClient,
     private val json: Json,
 ) {
-    suspend fun fetch(host: String, port: Int): PcServerStatus? = runCatching {
-        val body = httpClient.get("http://$host:$port/status").bodyAsText()
-        json.decodeFromString<PcServerStatus>(body)
+    /** [pin] is sent when the PC server has a PIN configured; it is ignored otherwise. */
+    suspend fun fetch(host: String, port: Int, pin: String = ""): PcServerStatus? = runCatching {
+        val response = httpClient.get("http://$host:$port/status") {
+            if (pin.isNotBlank()) header("X-StreamPanel-Pin", pin)
+        }
+        if (!response.status.isSuccess()) return@runCatching null
+        json.decodeFromString<PcServerStatus>(response.bodyAsText())
     }.getOrNull()
 }
