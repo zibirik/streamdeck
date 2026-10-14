@@ -32,3 +32,18 @@ jobs:
       - name: Build debug APK
         working-directory: android
         run: gradle assembleDebug --stacktrace
+      - name: UI smoke tests (renders every screen and saves screenshots)
+        # Informational for now: the renderer is verified on Windows; make it blocking once it has run on CI a few times.
+        continue-on-error: true
+        working-directory: android
+        run: gradle :feature:dashboard:testDebugUnitTest :feature:settings:testDebugUnitTest --stacktrace
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: |
+            android/feature/dashboard/build/screens/*.png
+            android/feature/settings/build/screens/*.png
+          if-no-files-found: ignore
+          retention-days: 14

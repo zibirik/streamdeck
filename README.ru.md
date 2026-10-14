@@ -149,20 +149,39 @@ Android Studio, .NET и другие инструменты разработчи
 
 ## Скриншоты
 
-> Ниже — иллюстрации из репозитория. Можешь заменить их реальными скринами планшета в `docs/images/`.
+> Снимки сделаны с настоящих экранов приложения на тестовых данных (`ShellScreenshotTest` / `SettingsScreenshotTest` пересоздают их на любом ПК, без планшета).
+
+<p align="center">
+<img src="docs/images/screens/deck-tablet.png" alt="Колода кнопок на планшете" width="100%"/>
+<br/><sub><b>Кнопки</b> — ваши кнопки, слои сверху, пять разделов в боковой панели</sub>
+</p>
 
 <table>
 <tr>
 <td align="center" width="50%">
-<img src="docs/images/preview-dashboard.svg" alt="Dashboard preview" width="100%"/>
-<br/><sub><b>Dashboard</b> — deck + sidebar + tools column</sub>
+<img src="docs/images/screens/control-tablet.png" alt="Экран Пульт" width="100%"/>
+<br/><sub><b>Пульт</b> — звук, быстрые команды, окна, запуск</sub>
 </td>
 <td align="center" width="50%">
-<img src="docs/images/preview-obs.svg" alt="OBS control room preview" width="100%"/>
-<br/><sub><b>OBS Studio</b> — Program / Preview + scene cards</sub>
+<img src="docs/images/screens/stream-tablet.png" alt="Экран Стрим" width="100%"/>
+<br/><sub><b>Стрим</b> — OBS, чат, Discord, игра</sub>
 </td>
 </tr>
 </table>
+
+<table>
+<tr>
+<td align="center" width="25%"><img src="docs/images/screens/deck-phone.png" alt="Кнопки на телефоне"/><br/><sub>Кнопки</sub></td>
+<td align="center" width="25%"><img src="docs/images/screens/control-phone.png" alt="Пульт на телефоне"/><br/><sub>Пульт</sub></td>
+<td align="center" width="25%"><img src="docs/images/screens/settings-phone.png" alt="Настройки на телефоне"/><br/><sub>Настройки</sub></td>
+<td align="center" width="25%"><img src="docs/images/screens/settings-pc-phone.png" alt="Подключение к ПК"/><br/><sub>Подключение к ПК</sub></td>
+</tr>
+</table>
+
+<p align="center">
+<img src="docs/images/preview-obs.svg" alt="OBS control room preview" width="70%"/>
+<br/><sub><b>OBS Studio</b> — Program / Preview и карточки сцен (иллюстрация)</sub>
+</p>
 
 <details>
 <summary><b>Ещё панели и инструменты</b></summary>

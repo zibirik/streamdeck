@@ -111,15 +111,15 @@ fun EditorScreen(
             topBar = {
                 TopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                    title = { Text(s.editorTitle, color = Color.White) },
+                    title = { Text(s.editorTitle, color = MaterialTheme.colorScheme.onSurface) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = s.back, tint = Color.White)
+                            Icon(Icons.Default.ArrowBack, contentDescription = s.back, tint = MaterialTheme.colorScheme.onSurface)
                         }
                     },
                     actions = {
                         IconButton(onClick = onDelete) {
-                            Icon(Icons.Default.Delete, contentDescription = s.delete, tint = Color.White)
+                            Icon(Icons.Default.Delete, contentDescription = s.delete, tint = MaterialTheme.colorScheme.onSurface)
                         }
                         Button(onClick = onSave, modifier = Modifier.padding(end = 16.dp)) {
                             Text(if (state.saved) s.saved else s.save)
@@ -138,7 +138,7 @@ fun EditorScreen(
             ) {
                 GlassSurface(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(s.livePreview, style = MaterialTheme.typography.titleLarge, color = Color.White)
+                        Text(s.livePreview, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
                         state.button?.let {
                             ControlButtonCard(
                                 button = it.copy(
@@ -168,7 +168,7 @@ fun EditorScreen(
                         StreamPanelTextField(state.draft.title, onTitleChange, s.name, Modifier.fillMaxWidth())
                         StreamPanelTextField(state.draft.subtitle, onSubtitleChange, s.subtitle, Modifier.fillMaxWidth())
                         StreamPanelTextField(state.draft.iconName, onIconChange, s.icon, Modifier.fillMaxWidth())
-                        Text(s.iconPresets, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
+                        Text(s.iconPresets, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf("bolt", "public", "apps", "folder", "live_tv", "mic_off", "timer", "school", "code", "sports_esports", "music_note", "photo_camera").forEach { icon ->
                                 AssistChip(
@@ -180,7 +180,7 @@ fun EditorScreen(
                         StreamPanelTextField(state.draft.imageUri, onImageUriChange, s.imageUrl, Modifier.fillMaxWidth())
                         StreamPanelTextField(state.draft.backgroundColor, onStartColorChange, s.accentColor, Modifier.fillMaxWidth())
                         StreamPanelTextField(state.draft.gradientEndColor, onEndColorChange, s.gradient, Modifier.fillMaxWidth())
-                        Text(s.colorPresets, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
+                        Text(s.colorPresets, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf("#8B5CF6", "#EF4444", "#38BDF8", "#22C55E", "#F59E0B", "#242836").forEach { hex ->
                                 AssistChip(
@@ -211,7 +211,7 @@ fun EditorScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(s.twoStateButton, color = Color.White)
+                            Text(s.twoStateButton, color = MaterialTheme.colorScheme.onSurface)
                             Switch(state.draft.isToggle, onToggleChange)
                         }
                         if (state.draft.isToggle) {
@@ -221,8 +221,8 @@ fun EditorScreen(
                     }
 
                 EditorSection(s.macroSteps(state.actionDrafts.size)) {
-                        Text(s.macroTemplates, color = Color.White.copy(alpha = 0.82f), style = MaterialTheme.typography.labelLarge)
-                        Text(s.simpleActions, color = Color.White.copy(alpha = 0.72f), style = MaterialTheme.typography.bodySmall)
+                        Text(s.macroTemplates, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f), style = MaterialTheme.typography.labelLarge)
+                        Text(s.simpleActions, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f), style = MaterialTheme.typography.bodySmall)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             MacroTemplate.entries.filterNot { it.programmable }.forEach { template ->
                                 AssistChip(
@@ -231,8 +231,8 @@ fun EditorScreen(
                                 )
                             }
                         }
-                        Text(s.advancedPrograms, color = Color.White.copy(alpha = 0.72f), style = MaterialTheme.typography.bodySmall)
-                        Text(s.programMacroHint, color = Color.White.copy(alpha = 0.62f), style = MaterialTheme.typography.bodySmall)
+                        Text(s.advancedPrograms, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f), style = MaterialTheme.typography.bodySmall)
+                        Text(s.programMacroHint, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f), style = MaterialTheme.typography.bodySmall)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             MacroTemplate.entries.filter { it.programmable }.forEach { template ->
                                 AssistChip(
@@ -248,10 +248,10 @@ fun EditorScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(s.step(index + 1), color = Color.White)
+                                    Text(s.step(index + 1), color = MaterialTheme.colorScheme.onSurface)
                                     if (state.actionDrafts.size > 1) {
                                         IconButton(onClick = { onRemoveAction(index) }) {
-                                            Icon(Icons.Default.Delete, contentDescription = s.delete, tint = Color.White)
+                                            Icon(Icons.Default.Delete, contentDescription = s.delete, tint = MaterialTheme.colorScheme.onSurface)
                                         }
                                     }
                                 }
@@ -300,14 +300,14 @@ fun EditorScreen(
                                 if (action.actionType == ActionType.LaunchProcess) {
                                     Text(
                                         s.launchAdminHint,
-                                        color = Color.White.copy(alpha = 0.7f),
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                         style = MaterialTheme.typography.bodySmall,
                                     )
                                 }
                                 if (action.actionType == ActionType.NavigatePage) {
                                     Text(
                                         s.navigatePageHint,
-                                        color = Color.White.copy(alpha = 0.7f),
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                         style = MaterialTheme.typography.bodySmall,
                                     )
                                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -326,8 +326,8 @@ fun EditorScreen(
                             }
                         }
                         OutlinedButton(onClick = onAddAction) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
-                            Text(" ${s.addStep}", color = Color.White)
+                            Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
+                            Text(" ${s.addStep}", color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
             }
@@ -389,7 +389,7 @@ private fun ActionValuePresets(
 private fun EditorSection(title: String, content: @Composable () -> Unit) {
     GlassSurface(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, color = Color.White)
+            Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
             content()
         }
     }

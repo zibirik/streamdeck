@@ -147,10 +147,10 @@ fun ObsScreen(
             containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
-                    title = { Text(s.obsStudio, color = Color.White) },
+                    title = { Text(s.obsStudio, color = MaterialTheme.colorScheme.onSurface) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
                         }
                     },
                     actions = {
@@ -158,7 +158,7 @@ fun ObsScreen(
                             CircularProgressIndicator(Modifier.padding(end = 16.dp))
                         } else {
                             IconButton(onClick = onRefresh) {
-                                Icon(Icons.Default.Refresh, contentDescription = s.obsRefresh, tint = Color.White)
+                                Icon(Icons.Default.Refresh, contentDescription = s.obsRefresh, tint = MaterialTheme.colorScheme.onSurface)
                             }
                         }
                     },
@@ -457,7 +457,7 @@ private fun ObsControlPanel(
                 }
             }
             OutlinedButton(onClick = onToggleStream, enabled = !state.working, modifier = Modifier.fillMaxWidth()) {
-                Text("Переключить эфир", color = Color.White)
+                Text("Переключить эфир", color = MaterialTheme.colorScheme.onSurface)
             }
 
             if (state.recording) {
@@ -512,16 +512,16 @@ private fun ObsControlPanel(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onToggleStudio, enabled = !state.working, modifier = Modifier.weight(1f)) {
-                    Text(if (state.studioModeEnabled) "Studio ON" else "Studio", color = Color.White, maxLines = 1)
+                    Text(if (state.studioModeEnabled) "Studio ON" else "Studio", color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
                 }
                 OutlinedButton(onClick = onToggleVirtualCam, enabled = !state.working, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Videocam, null, tint = Color.White)
-                    Text(" Cam", color = Color.White, maxLines = 1)
+                    Icon(Icons.Default.Videocam, null, tint = MaterialTheme.colorScheme.onSurface)
+                    Text(" Cam", color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onToggleReplay, enabled = !state.working, modifier = Modifier.weight(1f)) {
-                    Text("Replay", color = Color.White, maxLines = 1)
+                    Text("Replay", color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
                 }
                 OutlinedButton(onClick = onSaveReplay, enabled = !state.working, modifier = Modifier.weight(1f)) {
                     Text("Clip", maxLines = 1)

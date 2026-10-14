@@ -1,5 +1,22 @@
 package com.streampanel.feature.settings
 
+import com.streampanel.core.designsystem.BigButton
+import com.streampanel.core.designsystem.BigField
+import com.streampanel.core.designsystem.ChoicePill
+import com.streampanel.core.designsystem.ColorDots
+import com.streampanel.core.designsystem.HintText
+import com.streampanel.core.designsystem.IconBubble
+import com.streampanel.core.designsystem.MessagePill
+import com.streampanel.core.designsystem.MoreOptions
+import com.streampanel.core.designsystem.PageHeader
+import com.streampanel.core.designsystem.SectionLabel
+import com.streampanel.core.designsystem.SoftCard
+import com.streampanel.core.designsystem.StatusDot
+import com.streampanel.core.designsystem.Stepper
+import com.streampanel.core.designsystem.ToggleCard
+import com.streampanel.core.designsystem.UiPalette
+import com.streampanel.core.designsystem.tr
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -160,19 +177,19 @@ private fun ConnectionPage(state: SettingsUiState, vm: SettingsViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(18.dp))
-                    .background(if (picked) SettingsPalette.Green.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant)
-                    .border(2.dp, if (picked) SettingsPalette.Green else Color.Transparent, RoundedCornerShape(18.dp))
+                    .background(if (picked) UiPalette.Green.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant)
+                    .border(2.dp, if (picked) UiPalette.Green else Color.Transparent, RoundedCornerShape(18.dp))
                     .clickable { vm.selectDiscovered(server) }
                     .padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                IconBubble(Icons.Rounded.Computer, SettingsPalette.Green, size = 44)
+                IconBubble(Icons.Rounded.Computer, UiPalette.Green, size = 44)
                 Column(Modifier.weight(1f)) {
                     Text(server.machineName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     Text(server.host, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (picked) Icon(Icons.Rounded.Check, contentDescription = null, tint = SettingsPalette.Green)
+                if (picked) Icon(Icons.Rounded.Check, contentDescription = null, tint = UiPalette.Green)
             }
         }
         if (state.scanFinished && state.discoveredServers.isEmpty()) {
@@ -212,7 +229,7 @@ private fun ConnectionPage(state: SettingsUiState, vm: SettingsViewModel) {
     )
     ToggleCard(
         icon = Icons.Rounded.Wifi,
-        color = SettingsPalette.Cyan,
+        color = UiPalette.Cyan,
         title = tr("Подключаться сам", "Connect automatically"),
         subtitle = tr("При запуске приложения", "When the app starts"),
         checked = state.server.autoConnect,
@@ -263,13 +280,13 @@ private fun LookPage(state: SettingsUiState, vm: SettingsViewModel) {
 
     SectionLabel(tr("Главный цвет", "Main color"))
     SoftCard {
-        ColorDots(selected = state.appearance.accentColor, colors = SettingsPalette.Accents, onPick = vm::setAccent)
+        ColorDots(selected = state.appearance.accentColor, colors = UiPalette.Accents, onPick = vm::setAccent)
     }
 
     SectionLabel(tr("Ещё", "More"))
     ToggleCard(
         icon = Icons.Rounded.BlurOn,
-        color = SettingsPalette.Violet,
+        color = UiPalette.Violet,
         title = tr("Стеклянные панели", "Glass panels"),
         subtitle = tr("Полупрозрачные карточки", "See-through cards"),
         checked = state.appearance.enableGlass,
@@ -277,7 +294,7 @@ private fun LookPage(state: SettingsUiState, vm: SettingsViewModel) {
     )
     ToggleCard(
         icon = Icons.Rounded.LightMode,
-        color = SettingsPalette.Amber,
+        color = UiPalette.Amber,
         title = s.keepScreenOn,
         subtitle = tr("Экран не гаснет, пока приложение открыто", "The screen stays on while the app is open"),
         checked = state.appearance.keepScreenOn,
@@ -413,7 +430,7 @@ private fun DeckPage(state: SettingsUiState, vm: SettingsViewModel) {
 
     ToggleCard(
         icon = Icons.Rounded.SwapHoriz,
-        color = SettingsPalette.Blue,
+        color = UiPalette.Blue,
         title = tr("Сам менять слой", "Switch layer automatically"),
         subtitle = tr("Когда на ПК открывается другая программа", "When another program opens on the PC"),
         checked = state.focusTrackingEnabled,
@@ -486,7 +503,7 @@ private fun ProgramsPage(state: SettingsUiState, vm: SettingsViewModel) {
             key = app.id,
             title = app.name,
             subtitle = app.path,
-            color = parseHexColor(app.accent, SettingsPalette.Orange),
+            color = parseHexColor(app.accent, UiPalette.Orange),
             enabled = app.enabled,
             onEnabled = { vm.updateQuickLaunchApp(app.id, enabled = it) },
             onDelete = if (state.quickLaunchApps.size > 1) ({ vm.removeQuickLaunchApp(app.id) }) else null,
@@ -508,7 +525,7 @@ private fun LinksPage(state: SettingsUiState, vm: SettingsViewModel) {
             key = folder.id,
             title = folder.name,
             subtitle = folder.path,
-            color = parseHexColor(folder.accent, SettingsPalette.Lime),
+            color = parseHexColor(folder.accent, UiPalette.Lime),
             enabled = null,
             onDelete = if (state.quickOpenFolders.size > 1) ({ vm.removeFolder(folder.id) }) else null,
         ) {
@@ -526,7 +543,7 @@ private fun LinksPage(state: SettingsUiState, vm: SettingsViewModel) {
             key = group.id,
             title = group.name,
             subtitle = tr("Ссылок: $count", "Links: $count"),
-            color = parseHexColor(group.accent, SettingsPalette.Blue),
+            color = parseHexColor(group.accent, UiPalette.Blue),
             enabled = null,
             onDelete = if (state.quickOpenUrlGroups.size > 1) ({ vm.removeUrlGroup(group.id) }) else null,
         ) {
@@ -567,9 +584,9 @@ private fun StreamPage(state: SettingsUiState, vm: SettingsViewModel) {
         )
         HintText(tr("Код — это последняя часть ссылки: youtube.com/watch?v=КОД", "The ID is the last part of the link: youtube.com/watch?v=ID"))
     }
-    ToggleCard(Icons.Rounded.Dashboard, SettingsPalette.Blue, tr("Чат на главном экране", "Chat on the main screen"), chat.embedChatInDashboard, { vm.setStreamChatSettings(chat.copy(embedChatInDashboard = it)) })
-    ToggleCard(Icons.Rounded.Chat, SettingsPalette.Violet, tr("Показывать чат Twitch", "Show Twitch chat"), chat.showTwitchChat, { vm.setStreamChatSettings(chat.copy(showTwitchChat = it)) })
-    ToggleCard(Icons.Rounded.PlayCircle, SettingsPalette.Red, tr("Показывать чат YouTube", "Show YouTube chat"), chat.showYoutubeChat, { vm.setStreamChatSettings(chat.copy(showYoutubeChat = it)) })
+    ToggleCard(Icons.Rounded.Dashboard, UiPalette.Blue, tr("Чат на главном экране", "Chat on the main screen"), chat.embedChatInDashboard, { vm.setStreamChatSettings(chat.copy(embedChatInDashboard = it)) })
+    ToggleCard(Icons.Rounded.Chat, UiPalette.Violet, tr("Показывать чат Twitch", "Show Twitch chat"), chat.showTwitchChat, { vm.setStreamChatSettings(chat.copy(showTwitchChat = it)) })
+    ToggleCard(Icons.Rounded.PlayCircle, UiPalette.Red, tr("Показывать чат YouTube", "Show YouTube chat"), chat.showYoutubeChat, { vm.setStreamChatSettings(chat.copy(showYoutubeChat = it)) })
 }
 
 // ---------------------------------------------------------------- Games
@@ -580,7 +597,7 @@ private fun GamePage(state: SettingsUiState, vm: SettingsViewModel) {
     val game = state.gameOverlaySettings
     ToggleCard(
         icon = Icons.Rounded.AutoAwesome,
-        color = SettingsPalette.Red,
+        color = UiPalette.Red,
         title = tr("Данные из игры", "Game data"),
         subtitle = tr("Здоровье, патроны, счёт — прямо на планшете", "Health, ammo, score — right on the tablet"),
         checked = game.enabled,
@@ -654,13 +671,13 @@ private fun TimerPage(state: SettingsUiState, vm: SettingsViewModel) {
             key = project.id,
             title = project.name,
             subtitle = if (project.enabled) tr("Показывается", "Shown") else tr("Скрыт", "Hidden"),
-            color = parseHexColor(project.color, SettingsPalette.Violet),
+            color = parseHexColor(project.color, UiPalette.Violet),
             enabled = project.enabled,
             onEnabled = { vm.updateTimeTrackerProject(project.id, enabled = it) },
             onDelete = if (state.timeTrackerProjects.size > 1) ({ vm.removeTimeTrackerProject(project.id) }) else null,
         ) {
             BigField(project.name, { vm.updateTimeTrackerProject(project.id, name = it) }, tr("Название проекта", "Project name"))
-            ColorDots(project.color, SettingsPalette.Accents, { vm.updateTimeTrackerProject(project.id, color = it) })
+            ColorDots(project.color, UiPalette.Accents, { vm.updateTimeTrackerProject(project.id, color = it) })
         }
     }
     AddRestoreButtons(tr("Добавить проект", "Add a project"), vm::addTimeTrackerProject, vm::restoreTimeTrackerDefaults)
@@ -684,7 +701,7 @@ private fun BackupPage(state: SettingsUiState, vm: SettingsViewModel) {
 
     SoftCard {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            IconBubble(Icons.Rounded.Download, SettingsPalette.Green)
+            IconBubble(Icons.Rounded.Download, UiPalette.Green)
             Column {
                 Text(tr("Сохранить кнопки", "Save your buttons"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Text(tr("Чтобы перенести на другой планшет", "To move them to another tablet"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -696,7 +713,7 @@ private fun BackupPage(state: SettingsUiState, vm: SettingsViewModel) {
 
     SoftCard {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            IconBubble(Icons.Rounded.Restore, SettingsPalette.Blue)
+            IconBubble(Icons.Rounded.Restore, UiPalette.Blue)
             Column {
                 Text(tr("Вернуть кнопки", "Restore your buttons"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Text(tr("Скопируйте копию, потом нажмите кнопку", "Copy a backup, then tap the button"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -749,7 +766,7 @@ private fun ExportBox(text: String, vm: SettingsViewModel) {
             onClick = { clipboard.setText(AnnotatedString(text)); copied = true },
             modifier = Modifier.fillMaxWidth(),
             icon = if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy,
-            color = if (copied) SettingsPalette.Green else null,
+            color = if (copied) UiPalette.Green else null,
         )
     }
 }
@@ -792,14 +809,14 @@ private fun AboutPage(version: String) {
     }
 
     SectionLabel(tr("Помощь", "Help"))
-    LinkCard(Icons.Rounded.Language, SettingsPalette.Blue, tr("Страница проекта", "Project page"), "github.com/zibirik/streamdeck") { uri.openUri(GITHUB) }
-    LinkCard(Icons.Rounded.BugReport, SettingsPalette.Red, tr("Что-то сломалось?", "Something broke?"), tr("Напишите нам — починим", "Tell us — we will fix it")) { uri.openUri("$GITHUB/issues/new/choose") }
-    LinkCard(Icons.Rounded.Download, SettingsPalette.Green, tr("Новая версия", "New version"), tr("Скачать последнюю", "Download the latest")) { uri.openUri("$GITHUB/releases/latest") }
+    LinkCard(Icons.Rounded.Language, UiPalette.Blue, tr("Страница проекта", "Project page"), "github.com/zibirik/streamdeck") { uri.openUri(GITHUB) }
+    LinkCard(Icons.Rounded.BugReport, UiPalette.Red, tr("Что-то сломалось?", "Something broke?"), tr("Напишите нам — починим", "Tell us — we will fix it")) { uri.openUri("$GITHUB/issues/new/choose") }
+    LinkCard(Icons.Rounded.Download, UiPalette.Green, tr("Новая версия", "New version"), tr("Скачать последнюю", "Download the latest")) { uri.openUri("$GITHUB/releases/latest") }
 
     SectionLabel(tr("Условия", "Terms"))
     SoftCard {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            IconBubble(Icons.Rounded.Shield, SettingsPalette.Cyan)
+            IconBubble(Icons.Rounded.Shield, UiPalette.Cyan)
             Column {
                 Text(tr("Ваши данные — только ваши", "Your data stays yours"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Text(
@@ -812,11 +829,11 @@ private fun AboutPage(version: String) {
     }
     LinkCard(
         Icons.Rounded.Description,
-        SettingsPalette.Violet,
+        UiPalette.Violet,
         tr("Бесплатно для личного использования", "Free for personal use"),
         tr("Для бизнеса нужна лицензия — нажмите, чтобы узнать", "Business use needs a license — tap to learn more"),
     ) { uri.openUri("$GITHUB/blob/main/COMMERCIAL.md") }
-    LinkCard(Icons.Rounded.Email, SettingsPalette.Amber, tr("Написать автору", "Write to the author"), CONTACT_EMAIL) { uri.openUri("mailto:$CONTACT_EMAIL") }
+    LinkCard(Icons.Rounded.Email, UiPalette.Amber, tr("Написать автору", "Write to the author"), CONTACT_EMAIL) { uri.openUri("mailto:$CONTACT_EMAIL") }
 }
 
 @Composable
@@ -896,7 +913,7 @@ private fun ItemCard(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 content()
                 if (onDelete != null) {
-                    BigButton(tr("Удалить", "Delete"), onDelete, Modifier.fillMaxWidth(), icon = Icons.Rounded.Delete, color = SettingsPalette.Red)
+                    BigButton(tr("Удалить", "Delete"), onDelete, Modifier.fillMaxWidth(), icon = Icons.Rounded.Delete, color = UiPalette.Red)
                 }
             }
         }

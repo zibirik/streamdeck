@@ -1,5 +1,28 @@
 package com.streampanel.feature.dashboard
 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.ui.Alignment
+import com.streampanel.core.designsystem.BigButton
+import com.streampanel.core.designsystem.BigField
+import com.streampanel.core.designsystem.ChoicePill
+import com.streampanel.core.designsystem.MessagePill
+import com.streampanel.core.designsystem.SectionLabel
+import com.streampanel.core.designsystem.Stepper
+import com.streampanel.core.designsystem.StreamDialog
+import com.streampanel.core.designsystem.UiPalette
+import com.streampanel.core.designsystem.tr
+import kotlinx.coroutines.delay
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -194,9 +217,14 @@ fun DashboardScreen(
     onEmptyRecycleBin: () -> Unit,
 ) {
     val s = strings()
-    val snackbarHostState = remember { SnackbarHostState() }
+    var messageShown by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(state.lastMessage) {
-        state.lastMessage?.let { snackbarHostState.showSnackbar(it) }
+        val message = state.lastMessage
+        if (message != null) {
+            messageShown = message
+            delay(2600)
+            messageShown = null
+        }
     }
 
     val connected = state.connectionStatus is ConnectionStatus.Connected
@@ -264,127 +292,94 @@ fun DashboardScreen(
     )
 
     AppBackdrop {
-        Scaffold(
-            containerColor = androidx.compose.ui.graphics.Color.Transparent,
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-        ) { padding ->
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             AdaptiveDashboardLayout(
                 state = state,
                 s = s,
                 connected = connected,
-                modifier = Modifier
-                    .padding(padding)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 callbacks = callbacks,
+            )
+            MessagePill(
+                text = messageShown,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp, start = 16.dp, end = 16.dp),
             )
         }
     }
 
     state.buttonActionDialog?.let { button ->
-        AlertDialog(
-            onDismissRequest = onDismissButtonActions,
-            containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            title = { Text(s.macroActionsTitle(button.title)) },
-            text = { Text(s.macroActionsBody) },
-            confirmButton = {
-                TextButton(onClick = {
+        StreamDialog(onDismiss = onDismissButtonActions, title = button.title, message = s.macroActionsBody) {
+            BigButton(
+                text = s.edit,
+                onClick = {
                     onDismissButtonActions()
                     onEditButton(button.id)
-                }) {
-                    Text(s.edit, color = MaterialTheme.colorScheme.primary)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    onDeleteButton(button.id)
-                }) {
-                    Text(s.delete, color = MaterialTheme.colorScheme.error)
-                }
-            },
-        )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                icon = Icons.Rounded.Edit,
+            )
+            BigButton(
+                text = s.delete,
+                onClick = { onDeleteButton(button.id) },
+                modifier = Modifier.fillMaxWidth(),
+                icon = Icons.Rounded.Delete,
+                color = UiPalette.Red,
+            )
+            BigButton(s.cancel, onDismissButtonActions, Modifier.fillMaxWidth(), filled = false)
+        }
     }
 
     if (state.showLayerGridDialog) {
-        var layerTitle by remember(state.currentPage?.id) { mutableStateOf(state.currentPage?.title ?: "") }
-        var rows by remember(state.gridLayout.rows) { mutableStateOf(state.gridLayout.rows.toString()) }
-        var cols by remember(state.gridLayout.columns) { mutableStateOf(state.gridLayout.columns.toString()) }
-        AlertDialog(
-            onDismissRequest = onDismissLayerGridSettings,
-            containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            title = { Text(s.layerGridTitle(state.currentPage?.title ?: s.deckTitle)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(s.layerGridHint, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    com.streampanel.core.designsystem.StreamPanelTextField(
-                        value = layerTitle,
-                        onValueChange = { layerTitle = it },
-                        label = s.name,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        listOf(2, 3, 4, 5, 6).forEach { preset ->
-                            OutlinedButton(onClick = {
-                                rows = preset.toString()
-                                cols = preset.toString()
-                            }) {
-                                Text("${preset}×$preset")
-                            }
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        com.streampanel.core.designsystem.StreamPanelTextField(
-                            value = cols,
-                            onValueChange = { cols = it },
-                            label = s.columns,
-                            modifier = Modifier.weight(1f),
-                        )
-                        com.streampanel.core.designsystem.StreamPanelTextField(
-                            value = rows,
-                            onValueChange = { rows = it },
-                            label = s.rows,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    onRenamePage(layerTitle)
-                    onSetPageGrid(rows.toIntOrNull() ?: 4, cols.toIntOrNull() ?: 4)
-                    onDismissLayerGridSettings()
-                }) {
-                    Text(s.apply, color = MaterialTheme.colorScheme.primary)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismissLayerGridSettings) {
-                    Text(s.cancel, color = MaterialTheme.colorScheme.onSurface)
-                }
+        LayerSettingsDialog(
+            s = s,
+            initialTitle = state.currentPage?.title ?: "",
+            initialRows = state.gridLayout.rows,
+            initialColumns = state.gridLayout.columns,
+            onDismiss = onDismissLayerGridSettings,
+            onApply = { title, rows, cols ->
+                onRenamePage(title)
+                onSetPageGrid(rows, cols)
+                onDismissLayerGridSettings()
             },
         )
     }
 
     if (state.showSleepConfirm) {
-        AlertDialog(
-            onDismissRequest = onDismissSleep,
-            containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            title = { Text(s.sleepConfirmTitle) },
-            text = { Text(s.sleepConfirmBody) },
-            confirmButton = {
-                TextButton(onClick = onConfirmSleep) {
-                    Text(s.sleepNow, color = MaterialTheme.colorScheme.primary)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismissSleep) {
-                    Text(s.cancel, color = MaterialTheme.colorScheme.onSurface)
-                }
-            },
-        )
+        StreamDialog(onDismiss = onDismissSleep, title = s.sleepConfirmTitle, message = s.sleepConfirmBody) {
+            BigButton(s.sleepNow, onConfirmSleep, Modifier.fillMaxWidth(), icon = Icons.Rounded.Bedtime, color = UiPalette.Violet)
+            BigButton(s.cancel, onDismissSleep, Modifier.fillMaxWidth(), filled = false)
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LayerSettingsDialog(
+    s: com.streampanel.core.designsystem.AppStrings,
+    initialTitle: String,
+    initialRows: Int,
+    initialColumns: Int,
+    onDismiss: () -> Unit,
+    onApply: (String, Int, Int) -> Unit,
+) {
+    var title by remember { mutableStateOf(initialTitle) }
+    var rows by remember { mutableStateOf(initialRows.coerceIn(2, 8)) }
+    var cols by remember { mutableStateOf(initialColumns.coerceIn(2, 8)) }
+    StreamDialog(onDismiss = onDismiss, title = tr("Слой и сетка", "Layer and grid"), message = s.layerGridHint) {
+        BigField(title, { title = it }, s.name)
+        SectionLabel(tr("Быстрый выбор", "Quick pick"))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            listOf(2, 3, 4, 5, 6).forEach { preset ->
+                ChoicePill("$preset × $preset", selected = rows == preset && cols == preset, onClick = { rows = preset; cols = preset })
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Stepper(s.columns, cols, 2..8, { cols = it })
+            Stepper(s.rows, rows, 2..8, { rows = it })
+        }
+        BigButton(s.apply, { onApply(title, rows, cols) }, Modifier.fillMaxWidth(), icon = Icons.Rounded.Check)
+        BigButton(s.cancel, onDismiss, Modifier.fillMaxWidth(), filled = false)
     }
 }

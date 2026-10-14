@@ -149,20 +149,39 @@ Both devices must be on the **same Wi‑Fi network**. Updating later = install t
 
 ## Screenshots
 
-> Illustrations below ship with the repo. Drop real tablet screenshots into `docs/images/` to replace them anytime.
+> Rendered from the app's own screens with sample data (`ShellScreenshotTest` / `SettingsScreenshotTest` regenerate them on any PC, no device needed).
+
+<p align="center">
+<img src="docs/images/screens/deck-tablet.png" alt="Your deck of buttons on a tablet" width="100%"/>
+<br/><sub><b>Deck</b> — your own buttons, layers on top, five sections in the side rail</sub>
+</p>
 
 <table>
 <tr>
 <td align="center" width="50%">
-<img src="docs/images/preview-dashboard.svg" alt="Dashboard layout preview" width="100%"/>
-<br/><sub><b>Dashboard</b> — deck + sidebar + tools column</sub>
+<img src="docs/images/screens/control-tablet.png" alt="Control screen" width="100%"/>
+<br/><sub><b>Control</b> — sound, shortcuts, windows, launching</sub>
 </td>
 <td align="center" width="50%">
-<img src="docs/images/preview-obs.svg" alt="OBS control room preview" width="100%"/>
-<br/><sub><b>OBS Studio</b> — Program / Preview + scene cards</sub>
+<img src="docs/images/screens/stream-tablet.png" alt="Stream screen" width="100%"/>
+<br/><sub><b>Stream</b> — OBS, chat, Discord, game status</sub>
 </td>
 </tr>
 </table>
+
+<table>
+<tr>
+<td align="center" width="25%"><img src="docs/images/screens/deck-phone.png" alt="Deck on a phone"/><br/><sub>Deck</sub></td>
+<td align="center" width="25%"><img src="docs/images/screens/control-phone.png" alt="Control on a phone"/><br/><sub>Control</sub></td>
+<td align="center" width="25%"><img src="docs/images/screens/settings-phone.png" alt="Settings on a phone"/><br/><sub>Settings</sub></td>
+<td align="center" width="25%"><img src="docs/images/screens/settings-pc-phone.png" alt="Connecting to the PC"/><br/><sub>Connect to your PC</sub></td>
+</tr>
+</table>
+
+<p align="center">
+<img src="docs/images/preview-obs.svg" alt="OBS control room preview" width="70%"/>
+<br/><sub><b>OBS Studio</b> — Program / Preview + scene cards (illustration)</sub>
+</p>
 
 <details>
 <summary><b>More panels & tools</b></summary>

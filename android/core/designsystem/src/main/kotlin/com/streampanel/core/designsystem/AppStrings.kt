@@ -9,6 +9,8 @@ import com.streampanel.core.model.ThemeMode
 import com.streampanel.core.model.ToolsColumnWidth
 
 open class AppStrings {
+    /** True for the Russian translation; lets screens pick wording with [tr]. */
+    open val isRussian = false
     open val appName = "StreamPanel"
     open val controlDeck = "Control Deck"
     open val connect = "Connect"
@@ -370,6 +372,7 @@ open class AppStrings {
 }
 
 private class RussianAppStrings : AppStrings() {
+    override val isRussian get() = true
     override val controlDeck get() = "Панель управления"
     override val connect get() = "Подключить"
     override val disconnect get() = "Отключить"

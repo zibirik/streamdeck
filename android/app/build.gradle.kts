@@ -64,7 +64,6 @@ dependencies {
     implementation(project(":feature:dashboard"))
     implementation(project(":feature:editor"))
     implementation(project(":feature:settings"))
-    implementation(project(":feature:connections"))
     implementation(project(":feature:obs"))
 
     implementation(libs.androidx.core.ktx)

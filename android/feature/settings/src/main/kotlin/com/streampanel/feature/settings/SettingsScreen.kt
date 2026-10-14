@@ -1,5 +1,22 @@
 package com.streampanel.feature.settings
 
+import com.streampanel.core.designsystem.BigButton
+import com.streampanel.core.designsystem.BigField
+import com.streampanel.core.designsystem.ChoicePill
+import com.streampanel.core.designsystem.ColorDots
+import com.streampanel.core.designsystem.HintText
+import com.streampanel.core.designsystem.IconBubble
+import com.streampanel.core.designsystem.MessagePill
+import com.streampanel.core.designsystem.MoreOptions
+import com.streampanel.core.designsystem.PageHeader
+import com.streampanel.core.designsystem.SectionLabel
+import com.streampanel.core.designsystem.SoftCard
+import com.streampanel.core.designsystem.StatusDot
+import com.streampanel.core.designsystem.Stepper
+import com.streampanel.core.designsystem.ToggleCard
+import com.streampanel.core.designsystem.UiPalette
+import com.streampanel.core.designsystem.tr
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -65,10 +82,19 @@ import com.streampanel.core.model.AppLanguage
 import com.streampanel.core.network.ConnectionStatus
 import kotlinx.coroutines.delay
 
+/** Picks Russian or English wording for the hub's summaries and messages. */
+@androidx.compose.runtime.Immutable
+class Txt(val russian: Boolean) {
+    fun t(ru: String, en: String): String = if (russian) ru else en
+}
+
+internal val LocalTxt = androidx.compose.runtime.compositionLocalOf { Txt(russian = true) }
+
 @Composable
 fun SettingsRoute(
     onBack: () -> Unit,
     onOpenLayoutCustomizer: () -> Unit,
+    initialPage: String? = null,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -77,6 +103,7 @@ fun SettingsRoute(
         vm = viewModel,
         onBack = onBack,
         onOpenLayoutCustomizer = onOpenLayoutCustomizer,
+        initialPage = initialPage,
     )
 }
 
@@ -90,19 +117,19 @@ enum class SettingsPage(
     val subEn: String,
     val external: Boolean = false,
 ) {
-    Connection(Icons.Rounded.Computer, SettingsPalette.Green, "Мой ПК", "My PC", "Подключите планшет к компьютеру", "Link the tablet to your computer"),
-    Look(Icons.Rounded.Palette, SettingsPalette.Violet, "Внешний вид", "Look", "Цвета, тема и фон", "Colors, theme and background"),
-    Deck(Icons.Rounded.GridView, SettingsPalette.Blue, "Кнопки", "Buttons", "Сколько кнопок на экране", "How many buttons fit the screen"),
-    Language(Icons.Rounded.Translate, SettingsPalette.Cyan, "Язык", "Language", "На каком языке приложение", "The language of the app"),
-    QuickActions(Icons.Rounded.FlashOn, SettingsPalette.Amber, "Быстрые действия", "Quick actions", "Копировать, вставить, скриншот…", "Copy, paste, screenshot…"),
-    Programs(Icons.Rounded.RocketLaunch, SettingsPalette.Orange, "Программы", "Programs", "Что запускать одним касанием", "What to launch with one tap"),
-    Links(Icons.Rounded.FolderOpen, SettingsPalette.Lime, "Папки и ссылки", "Folders & links", "Быстрый доступ на ПК", "Quick access on the PC"),
-    Stream(Icons.Rounded.LiveTv, SettingsPalette.Pink, "Стрим и чат", "Stream & chat", "Twitch и YouTube", "Twitch and YouTube"),
-    Game(Icons.Rounded.SportsEsports, SettingsPalette.Red, "Игры", "Games", "Показывать данные из игры", "Show data from the game"),
-    Timer(Icons.Rounded.Timer, SettingsPalette.Cyan, "Таймер", "Timer", "Помодоро и учёт времени", "Pomodoro and time tracking"),
-    Layout(Icons.Rounded.Dashboard, SettingsPalette.Blue, "Панели", "Panels", "Что и где показывать", "What to show and where", external = true),
-    Backup(Icons.Rounded.Backup, SettingsPalette.Slate, "Копия", "Backup", "Сохранить или перенести кнопки", "Save or move your buttons"),
-    About(Icons.Rounded.Info, SettingsPalette.Violet, "О приложении", "About", "Версия, помощь и лицензия", "Version, help and license"),
+    Connection(Icons.Rounded.Computer, UiPalette.Green, "Мой ПК", "My PC", "Подключите планшет к компьютеру", "Link the tablet to your computer"),
+    Look(Icons.Rounded.Palette, UiPalette.Violet, "Внешний вид", "Look", "Цвета, тема и фон", "Colors, theme and background"),
+    Deck(Icons.Rounded.GridView, UiPalette.Blue, "Кнопки", "Buttons", "Сколько кнопок на экране", "How many buttons fit the screen"),
+    Language(Icons.Rounded.Translate, UiPalette.Cyan, "Язык", "Language", "На каком языке приложение", "The language of the app"),
+    QuickActions(Icons.Rounded.FlashOn, UiPalette.Amber, "Быстрые действия", "Quick actions", "Копировать, вставить, скриншот…", "Copy, paste, screenshot…"),
+    Programs(Icons.Rounded.RocketLaunch, UiPalette.Orange, "Программы", "Programs", "Что запускать одним касанием", "What to launch with one tap"),
+    Links(Icons.Rounded.FolderOpen, UiPalette.Lime, "Папки и ссылки", "Folders & links", "Быстрый доступ на ПК", "Quick access on the PC"),
+    Stream(Icons.Rounded.LiveTv, UiPalette.Pink, "Стрим и чат", "Stream & chat", "Twitch и YouTube", "Twitch and YouTube"),
+    Game(Icons.Rounded.SportsEsports, UiPalette.Red, "Игры", "Games", "Показывать данные из игры", "Show data from the game"),
+    Timer(Icons.Rounded.Timer, UiPalette.Cyan, "Таймер", "Timer", "Помодоро и учёт времени", "Pomodoro and time tracking"),
+    Layout(Icons.Rounded.Dashboard, UiPalette.Blue, "Панели", "Panels", "Что и где показывать", "What to show and where", external = true),
+    Backup(Icons.Rounded.Backup, UiPalette.Slate, "Копия", "Backup", "Сохранить или перенести кнопки", "Save or move your buttons"),
+    About(Icons.Rounded.Info, UiPalette.Violet, "О приложении", "About", "Версия, помощь и лицензия", "Version, help and license"),
     ;
 
     fun title(t: Txt) = t.t(ru, en)
@@ -115,6 +142,7 @@ fun SettingsScreen(
     vm: SettingsViewModel,
     onBack: () -> Unit,
     onOpenLayoutCustomizer: () -> Unit,
+    initialPage: String? = null,
 ) {
     val txt = remember(state.language) { Txt(russian = state.language == AppLanguage.Russian) }
     val context = LocalContext.current
@@ -122,7 +150,7 @@ fun SettingsScreen(
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty()
     }
 
-    var pageName by rememberSaveable { mutableStateOf<String?>(null) }
+    var pageName by rememberSaveable { mutableStateOf(initialPage) }
     val page = pageName?.let { name -> SettingsPage.entries.firstOrNull { it.name == name } }
 
     BackHandler(enabled = page != null) {
@@ -221,7 +249,7 @@ private fun SettingsHub(
     val s = strings()
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 168.dp),
+            columns = GridCells.Adaptive(minSize = 190.dp),
             modifier = Modifier.widthIn(max = 920.dp).fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 40.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -287,13 +315,13 @@ fun connectionLook(state: SettingsUiState): ConnectionLook {
     val address = "${state.server.host}:${state.server.port}"
     return when (val status = state.connectionStatus) {
         is ConnectionStatus.Connected -> ConnectionLook(
-            SettingsPalette.Green, tr("ПК подключён", "PC connected"), address, busy = false,
+            UiPalette.Green, tr("ПК подключён", "PC connected"), address, busy = false,
         )
         ConnectionStatus.Connecting -> ConnectionLook(
-            SettingsPalette.Amber, tr("Подключаюсь…", "Connecting…"), address, busy = true,
+            UiPalette.Amber, tr("Подключаюсь…", "Connecting…"), address, busy = true,
         )
         is ConnectionStatus.Failed -> ConnectionLook(
-            SettingsPalette.Red,
+            UiPalette.Red,
             if (status.reason.contains("PIN", ignoreCase = true)) tr("Неверный PIN-код", "Wrong PIN") else tr("Не получилось подключиться", "Could not connect"),
             if (status.reason.contains("PIN", ignoreCase = true)) {
                 tr("Проверьте PIN в настройках «Мой ПК»", "Check the PIN in “My PC”")
@@ -303,7 +331,7 @@ fun connectionLook(state: SettingsUiState): ConnectionLook {
             busy = false,
         )
         ConnectionStatus.Disconnected -> ConnectionLook(
-            SettingsPalette.Slate, tr("Не подключено", "Not connected"), tr("Нажмите «Найти ПК»", "Tap “Find PC”"), busy = false,
+            UiPalette.Slate, tr("Не подключено", "Not connected"), tr("Нажмите «Найти ПК»", "Tap “Find PC”"), busy = false,
         )
     }
 }

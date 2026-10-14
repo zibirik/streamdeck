@@ -116,26 +116,9 @@ data class DashboardLayoutSettings(
             DashboardZone.ToolsColumn,
         )
 
-        fun defaultPanelSlots(): List<DashboardPanelSlot> = listOf(
-            DashboardPanelSlot(DashboardPanelId.HardwareMonitor),
-            DashboardPanelSlot(DashboardPanelId.ProcessMonitor),
-            DashboardPanelSlot(DashboardPanelId.DevTools),
-            DashboardPanelSlot(DashboardPanelId.StreamTools),
-            DashboardPanelSlot(DashboardPanelId.StreamChat),
-            DashboardPanelSlot(DashboardPanelId.GameStatus),
-            DashboardPanelSlot(DashboardPanelId.PcConfigurator),
-            DashboardPanelSlot(DashboardPanelId.Discord),
-            DashboardPanelSlot(DashboardPanelId.StudyMode),
-            DashboardPanelSlot(DashboardPanelId.MeetingMode),
-            DashboardPanelSlot(DashboardPanelId.Pomodoro),
-            DashboardPanelSlot(DashboardPanelId.TimeTracker),
-            DashboardPanelSlot(DashboardPanelId.Clipboard),
-            DashboardPanelSlot(DashboardPanelId.QuickActions),
-            DashboardPanelSlot(DashboardPanelId.Media),
-            DashboardPanelSlot(DashboardPanelId.SystemTools),
-            DashboardPanelSlot(DashboardPanelId.NavigationShortcuts),
-            DashboardPanelSlot(DashboardPanelId.QuickLaunch),
-        )
+        /** Panels grouped by the screen they live on (Control, Stream, My PC, Work), each group in a sensible order. */
+        fun defaultPanelSlots(): List<DashboardPanelSlot> =
+            HubSection.entries.flatMap { it.panels }.map { DashboardPanelSlot(it) }
 
         fun mergeWithDefaults(raw: DashboardLayoutSettings?): DashboardLayoutSettings {
             if (raw == null) return DashboardLayoutSettings()
