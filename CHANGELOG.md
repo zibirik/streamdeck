@@ -5,6 +5,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-14
+
 ### Changed
 - Settings redesigned from scratch: a home screen of big colorful tiles, one simple page per topic,
   live connection status, "Find my PC" auto-discovery, theme previews, color swatches instead of hex codes,
@@ -13,6 +15,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - Choosing a grid preset (e.g. 4×4) could keep the old row count because rows and columns were saved separately.
+
+## [0.2.0] - 2026-10-14
 
 ### Security
 - PIN authentication is now enforced per WebSocket connection and for the HTTP API

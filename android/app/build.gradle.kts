@@ -8,7 +8,7 @@ plugins {
 }
 
 // Version comes from CI (-PappVersionName=1.2.3 -PappVersionCode=42) when a release is built from a tag.
-val appVersionName: String = providers.gradleProperty("appVersionName").getOrElse("0.2.0")
+val appVersionName: String = providers.gradleProperty("appVersionName").getOrElse("0.2.1")
 val appVersionCode: Int = providers.gradleProperty("appVersionCode").map(String::toInt).getOrElse(17)
 
 // Release signing key is supplied through the environment so it never lives in the repo.
