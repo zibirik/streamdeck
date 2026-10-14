@@ -357,7 +357,7 @@ streamdeck/
 | Школа, благотворительная организация, госучреждение | **Бесплатно** |
 | Компания, студия, агентство; работа для клиентов; бизнес / монетизируемое использование; перепродажа и встраивание | **Нужна коммерческая лицензия** — см. [`COMMERCIAL.md`](COMMERCIAL.md) |
 
-Не уверен? [Спроси в issue](https://github.com/zibirik/streamdeck/issues/new/choose).
+Не уверен? [Спроси в issue](https://github.com/zibirik/streamdeck/issues/new/choose) или напиши на [zibirik122@yandex.ru](mailto:zibirik122@yandex.ru).
 Сторонние компоненты и товарные знаки: [`NOTICE.md`](NOTICE.md). StreamPanel — независимый проект, не связан с Elgato/Corsair
 («Stream Deck» — их товарный знак), OBS, Spotify, Discord, Valve и другими упомянутыми брендами.
 

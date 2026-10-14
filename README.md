@@ -357,7 +357,7 @@ StreamPanel is **source-available** under the [PolyForm Noncommercial License 1.
 | A school, charity or public institution | **Free** |
 | A company, studio or agency; client work; business / monetised use; reselling or embedding it | **Commercial license required** — see [`COMMERCIAL.md`](COMMERCIAL.md) |
 
-Not sure? [Ask in an issue](https://github.com/zibirik/streamdeck/issues/new/choose).
+Not sure? [Ask in an issue](https://github.com/zibirik/streamdeck/issues/new/choose) or write to [zibirik122@yandex.ru](mailto:zibirik122@yandex.ru).
 Third-party software and trademarks: [`NOTICE.md`](NOTICE.md). StreamPanel is independent and not affiliated with Elgato/Corsair
 ("Stream Deck" is their trademark), OBS, Spotify, Discord, Valve or any other mentioned brand.
 

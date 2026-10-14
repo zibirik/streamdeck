@@ -20,8 +20,9 @@ If you are not sure which side you are on, ask first.
 Open an issue using the **Commercial license request** template:
 <https://github.com/zibirik/streamdeck/issues/new/choose>
 
+Or write by e-mail: [zibirik122@yandex.ru](mailto:zibirik122@yandex.ru)
+
 Please include: who you are (company / project), how many PCs or tablets, and what you plan to do with it.
-(Maintainer: add a contact e-mail or a payment link here once you have one.)
 
 ## Русский
 
@@ -40,5 +41,7 @@ Please include: who you are (company / project), how many PCs or tablets, and wh
 
 Создайте обращение по шаблону **Commercial license request**:
 <https://github.com/zibirik/streamdeck/issues/new/choose>
+
+Или напишите на почту: [zibirik122@yandex.ru](mailto:zibirik122@yandex.ru)
 
 Укажите: кто вы (компания / проект), сколько ПК и планшетов, как собираетесь использовать.
