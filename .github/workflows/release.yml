@@ -35,7 +35,7 @@ jobs:
             throw "Secret ANDROID_KEYSTORE_BASE64 is missing. Run tools/create-keystore.ps1 and add the secrets (docs/releasing.md)."
           }
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
       - uses: actions/setup-java@v4
