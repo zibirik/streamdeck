@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older: keep the deck (Room database) in backups, but never copy
+     DataStore preferences - they hold the PC PIN and OBS/Spotify/Home Assistant credentials. -->
+<full-backup-content>
+    <exclude domain="file" path="datastore/" />
+</full-backup-content>

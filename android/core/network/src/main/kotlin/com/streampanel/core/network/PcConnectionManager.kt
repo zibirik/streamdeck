@@ -48,7 +48,7 @@ class PcConnectionManager @Inject constructor(
                 ),
             )
             if (!auth.ok) {
-                pcConnectionClient.disconnect()
+                pcConnectionClient.disconnect(failureMessage = auth.message.ifBlank { "PIN rejected by PC" })
             }
         }
     }

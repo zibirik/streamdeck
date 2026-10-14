@@ -18,7 +18,7 @@ public sealed class CommandHandler(
     IAudioOutputSwitcher audioOutputSwitcher,
     IProcessController processController,
     IClipboardService clipboardService,
-    PinAuthService pinAuthService,
+    UrlGuard urlGuard,
     IConfiguration configuration,
     ILogger<CommandHandler> logger
 ) : ICommandHandler
@@ -59,20 +59,36 @@ public sealed class CommandHandler(
         }
     }
 
-    private static PcCommandResponse OpenUrl(PcCommand command)
+    private PcCommandResponse OpenUrl(PcCommand command)
     {
-        var url = Required(command, "url");
+        if (!urlGuard.TryValidate(Required(command, "url"), out var url, out var error))
+        {
+            return PcCommandResponse.Failure(command.Id, error);
+        }
+
         Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         return PcCommandResponse.Success(command.Id, "Opened URL.");
     }
 
-    private static PcCommandResponse OpenUrls(PcCommand command)
+    private PcCommandResponse OpenUrls(PcCommand command)
     {
         var raw = Required(command, "urls");
-        var urls = raw.Split(['|', ';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (urls.Length == 0)
+        var candidates = raw.Split(['|', ';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (candidates.Length == 0)
         {
             return PcCommandResponse.Failure(command.Id, "No URLs provided.");
+        }
+
+        // Validate everything first so a bad entry does not leave a half-opened group.
+        var urls = new List<string>(candidates.Length);
+        foreach (var candidate in candidates)
+        {
+            if (!urlGuard.TryValidate(candidate, out var url, out var error))
+            {
+                return PcCommandResponse.Failure(command.Id, error);
+            }
+
+            urls.Add(url);
         }
 
         foreach (var url in urls)
@@ -80,7 +96,7 @@ public sealed class CommandHandler(
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         }
 
-        return PcCommandResponse.Success(command.Id, $"Opened {urls.Length} URLs.");
+        return PcCommandResponse.Success(command.Id, $"Opened {urls.Count} URLs.");
     }
 
     private static PcCommandResponse OpenFolder(PcCommand command)
@@ -125,9 +141,9 @@ public sealed class CommandHandler(
     private PcCommandResponse SendMouseCommand(PcCommand command)
     {
         var mouseCommand = Required(command, "command").ToLowerInvariant();
-        var x = command.Payload.TryGetValue("x", out var rawX) ? int.Parse(rawX) : 0;
-        var y = command.Payload.TryGetValue("y", out var rawY) ? int.Parse(rawY) : 0;
-        var delta = command.Payload.TryGetValue("delta", out var rawDelta) ? int.Parse(rawDelta) : 0;
+        var x = OptionalInt(command, "x", 0);
+        var y = OptionalInt(command, "y", 0);
+        var delta = OptionalInt(command, "delta", 0);
 
         switch (mouseCommand)
         {
@@ -170,14 +186,14 @@ public sealed class CommandHandler(
             case "get_mic_mute":
                 return PcCommandResponse.Success(command.Id, $"micMuted:{volumeController.GetMicMuted()}");
             case "set":
-                var percent = int.Parse(Required(command, "percent"));
+                var percent = Math.Clamp(RequiredInt(command, "percent"), 0, 100);
                 volumeController.SetVolumePercent(percent);
                 break;
             case "up":
-                volumeController.VolumeUp(command.Payload.TryGetValue("steps", out var upSteps) ? int.Parse(upSteps) : 2);
+                volumeController.VolumeUp(Math.Clamp(OptionalInt(command, "steps", 2), 1, 50));
                 break;
             case "down":
-                volumeController.VolumeDown(command.Payload.TryGetValue("steps", out var downSteps) ? int.Parse(downSteps) : 2);
+                volumeController.VolumeDown(Math.Clamp(OptionalInt(command, "steps", 2), 1, 50));
                 break;
             case "mute":
                 volumeController.Mute();
@@ -227,7 +243,7 @@ public sealed class CommandHandler(
                 windowController.SnapRight();
                 break;
             case "move_monitor":
-                var monitor = int.Parse(command.Payload.TryGetValue("monitor", out var rawMonitor) ? rawMonitor : "2");
+                var monitor = OptionalInt(command, "monitor", 2);
                 windowController.MoveActiveToMonitor(monitor);
                 break;
             default:
@@ -284,7 +300,7 @@ public sealed class CommandHandler(
                 Process.Start(new ProcessStartInfo("powershell.exe", "-NoProfile -Command \"Set-ItemProperty -Path HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Notifications\\Settings -Name NOC_GLOBAL_SETTING_TOASTS_ENABLED -Value 1\"") { UseShellExecute = false, CreateNoWindow = true });
                 break;
             case "kill_process_pid":
-                var pid = int.Parse(Required(command, "pid"));
+                var pid = RequiredInt(command, "pid");
                 Process.GetProcessById(pid).Kill(entireProcessTree: true);
                 break;
             case "git_pull":
@@ -329,6 +345,8 @@ public sealed class CommandHandler(
                 Thread.Sleep(150);
                 inputSimulator.SendHotkey(command.Payload.GetValueOrDefault("keys", "CTRL+`"));
                 break;
+            default:
+                return PcCommandResponse.Failure(command.Id, $"System command '{name}' has no implementation.");
         }
 
         return PcCommandResponse.Success(command.Id, $"System command '{name}' executed.");
@@ -342,15 +360,7 @@ public sealed class CommandHandler(
             return PcCommandResponse.Success(command.Id, "pong");
         }
 
-        if (command.Payload.TryGetValue("action", out var authAction) &&
-            authAction.Equals("auth", StringComparison.OrdinalIgnoreCase))
-        {
-            command.Payload.TryGetValue("pin", out var pin);
-            return pinAuthService.TryAuthenticate(pin)
-                ? PcCommandResponse.Success(command.Id, "Authenticated.")
-                : PcCommandResponse.Failure(command.Id, "Invalid PIN.");
-        }
-
+        // "auth" is handled per connection by ClientSession and never reaches this handler.
         return PcCommandResponse.Success(command.Id, "Custom command accepted.");
     }
 
@@ -425,6 +435,26 @@ public sealed class CommandHandler(
         }
 
         throw new InvalidOperationException($"Missing payload key '{key}'.");
+    }
+
+    private static int RequiredInt(PcCommand command, string key)
+    {
+        var raw = Required(command, key);
+        return int.TryParse(raw, out var value)
+            ? value
+            : throw new InvalidOperationException($"Payload key '{key}' must be an integer, got '{raw}'.");
+    }
+
+    private static int OptionalInt(PcCommand command, string key, int fallback)
+    {
+        if (!command.Payload.TryGetValue(key, out var raw) || string.IsNullOrWhiteSpace(raw))
+        {
+            return fallback;
+        }
+
+        return int.TryParse(raw, out var value)
+            ? value
+            : throw new InvalidOperationException($"Payload key '{key}' must be an integer, got '{raw}'.");
     }
 
     [DllImport("user32.dll")]

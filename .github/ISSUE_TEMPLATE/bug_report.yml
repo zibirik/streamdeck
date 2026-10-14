@@ -1,0 +1,33 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      placeholder: "0.2.0 (see the APK file name or Android → App info)"
+    validations:
+      required: true
+  - type: input
+    id: server-version
+    attributes:
+      label: Windows server version
+      placeholder: "0.2.0"
+  - type: input
+    id: devices
+    attributes:
+      label: Devices
+      placeholder: "Tablet model + Android version, Windows version"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Server console output helps a lot. Remove your PIN and tokens first!

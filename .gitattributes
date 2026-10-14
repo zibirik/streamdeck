@@ -1,0 +1,11 @@
+* text=auto
+
+# The Unix wrapper script must keep LF line endings or it breaks on Linux/macOS.
+android/gradlew text eol=lf
+*.bat text eol=crlf
+
+*.jar binary
+*.png binary
+*.jpg binary
+*.keystore binary
+*.jks binary

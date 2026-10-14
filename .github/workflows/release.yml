@@ -1,0 +1,100 @@
+name: Release
+
+# Push a tag like v1.0.0 (or v1.0.0-beta.1) to build and publish a GitHub release.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: windows-latest
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Tag '${{ github.ref_name }}' is not a semantic version." }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          # versionCode must only ever grow; the run number does.
+          "code=$(100 + [int]$env:GITHUB_RUN_NUMBER)" >> $env:GITHUB_OUTPUT
+          "prerelease=$($version.Contains('-').ToString().ToLower())" >> $env:GITHUB_OUTPUT
+
+      - name: Require the Android signing key
+        shell: pwsh
+        run: |
+          if (-not $env:ANDROID_KEYSTORE_BASE64) {
+            throw "Secret ANDROID_KEYSTORE_BASE64 is missing. Run tools/create-keystore.ps1 and add the secrets (docs/releasing.md)."
+          }
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.10.2
+
+      - name: Server tests
+        run: dotnet test server/windows/StreamPanel.sln -c Release
+
+      - name: Decode signing key
+        shell: pwsh
+        run: |
+          $path = Join-Path $env:RUNNER_TEMP "release.jks"
+          [IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($env:ANDROID_KEYSTORE_BASE64))
+          "STREAMPANEL_KEYSTORE_FILE=$path" >> $env:GITHUB_ENV
+
+      - name: Build signed release APK
+        working-directory: android
+        shell: pwsh
+        env:
+          STREAMPANEL_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          STREAMPANEL_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          STREAMPANEL_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle assembleRelease "-PappVersionName=${{ steps.version.outputs.version }}" "-PappVersionCode=${{ steps.version.outputs.code }}" --stacktrace
+
+      - name: Verify the APK is signed with the release key (not the debug key)
+        shell: pwsh
+        run: |
+          $apksigner = Get-ChildItem "$env:ANDROID_HOME\build-tools" -Recurse -Filter apksigner.bat | Sort-Object FullName | Select-Object -Last 1
+          $output = & $apksigner.FullName verify --print-certs android/app/build/outputs/apk/release/app-release.apk 2>&1 | Out-String
+          Write-Host $output
+          if ($LASTEXITCODE -ne 0) { throw "apksigner verification failed." }
+          if ($output -match "Android Debug") { throw "APK is signed with the debug key." }
+
+      - name: Package release files
+        shell: pwsh
+        run: ./tools/package-release.ps1 -Version "${{ steps.version.outputs.version }}" -ApkPath android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: StreamPanel ${{ steps.version.outputs.version }}
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/release/StreamPanel-v${{ steps.version.outputs.version }}.apk
+            dist/release/StreamPanel-Server-v${{ steps.version.outputs.version }}-win-x64.zip
+            dist/release/SHA256SUMS.txt
+          body: |
+            ## Install
+
+            1. **PC (Windows 10/11):** download `StreamPanel-Server-v${{ steps.version.outputs.version }}-win-x64.zip`, unzip, run `START-SERVER.bat`. No .NET installation needed.
+            2. **Tablet (Android 8.0+):** download and install `StreamPanel-v${{ steps.version.outputs.version }}.apk`.
+            3. Set a **PIN** in `appsettings.json` on the PC and enter the same PIN in the app.
+
+            Free for noncommercial use. Commercial use requires a license: see [COMMERCIAL.md](https://github.com/${{ github.repository }}/blob/main/COMMERCIAL.md).
+            Verify downloads with `SHA256SUMS.txt`.

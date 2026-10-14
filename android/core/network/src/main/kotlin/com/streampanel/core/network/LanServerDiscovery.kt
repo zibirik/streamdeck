@@ -40,7 +40,8 @@ class LanServerDiscovery @Inject constructor(
     private suspend fun probe(host: String, port: Int): DiscoveredServer? =
         withTimeoutOrNull(350) {
             runCatching {
-                val body = httpClient.get("http://$host:$port/status").bodyAsText()
+                // /api is the public identity endpoint: it works before the user has entered a PIN.
+                val body = httpClient.get("http://$host:$port/api").bodyAsText()
                 val root = json.parseToJsonElement(body).jsonObject
                 val name = root["name"]?.jsonPrimitive?.content
                 if (name != "StreamPanel Server") return@runCatching null
