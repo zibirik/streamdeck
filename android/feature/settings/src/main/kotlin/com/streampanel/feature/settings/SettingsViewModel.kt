@@ -18,6 +18,10 @@ import com.streampanel.core.model.StreamChatSettings
 import com.streampanel.core.model.ThemeMode
 import com.streampanel.core.model.TimeLogEntry
 import com.streampanel.core.model.TimeTrackerProject
+import com.streampanel.core.network.ConnectionStatus
+import com.streampanel.core.network.DiscoveredServer
+import com.streampanel.core.network.LanServerDiscovery
+import com.streampanel.core.network.PcConnectionClient
 import com.streampanel.core.network.PcConnectionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,18 +34,37 @@ import kotlinx.serialization.json.Json
 import java.util.UUID
 import javax.inject.Inject
 
+/** What happened, without any text: the screen turns it into the user's language. */
+enum class SettingsMessageKind {
+    ConnectionSaved,
+    Connecting,
+    DeckExported,
+    DeckImported,
+    ImportFailed,
+    NothingToExport,
+    NoTimeEntries,
+    TimeCsvReady,
+}
+
+data class SettingsMessage(val kind: SettingsMessageKind, val detail: String? = null)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val preferencesDataSource: PreferencesDataSource,
     private val repository: ControlPanelRepository,
     private val connectionManager: PcConnectionManager,
+    private val pcConnectionClient: PcConnectionClient,
+    private val lanServerDiscovery: LanServerDiscovery,
     private val json: Json,
 ) : ViewModel() {
     private val exportJson = MutableStateFlow<String?>(null)
-    private val statusMessage = MutableStateFlow<String?>(null)
+    private val message = MutableStateFlow<SettingsMessage?>(null)
     private val serverHostDraft = MutableStateFlow<String?>(null)
     private val serverPortDraft = MutableStateFlow<String?>(null)
     private val serverPinDraft = MutableStateFlow<String?>(null)
+    private val discovered = MutableStateFlow<List<DiscoveredServer>>(emptyList())
+    private val scanning = MutableStateFlow(false)
+    private val scanFinished = MutableStateFlow(false)
 
     val uiState = combine(
         combine(
@@ -101,12 +124,18 @@ class SettingsViewModel @Inject constructor(
             serverPinDraft = pin ?: base.server.pin,
         )
     }.combine(exportJson) { base, export -> base.copy(exportJson = export) }
-        .combine(statusMessage) { base, msg -> base.copy(statusMessage = msg) }
+        .combine(message) { base, msg -> base.copy(message = msg) }
+        .combine(pcConnectionClient.status) { base, status -> base.copy(connectionStatus = status) }
+        .combine(
+            combine(discovered, scanning, scanFinished) { found, busy, done -> Triple(found, busy, done) },
+        ) { base, (found, busy, done) ->
+            base.copy(discoveredServers = found, scanning = busy, scanFinished = done)
+        }
         .stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5_000),
-        SettingsUiState(),
-    )
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            SettingsUiState(),
+        )
 
     fun setLanguage(language: AppLanguage) = viewModelScope.launch {
         preferencesDataSource.setAppLanguage(language)
@@ -128,10 +157,6 @@ class SettingsViewModel @Inject constructor(
         preferencesDataSource.setGlassEnabled(enabled)
     }
 
-    fun setCornerRadius(value: Int) = viewModelScope.launch {
-        preferencesDataSource.setCornerRadius(value)
-    }
-
     fun setPomodoroFocusMinutes(value: Int) = viewModelScope.launch {
         preferencesDataSource.setPomodoroFocusMinutes(value)
     }
@@ -144,12 +169,9 @@ class SettingsViewModel @Inject constructor(
         preferencesDataSource.setGameOverlaySettings(settings)
     }
 
-    fun setRows(value: Int) = viewModelScope.launch {
-        preferencesDataSource.setGridLayout(uiState.value.grid.copy(rows = value.coerceIn(1, 12)))
-    }
-
-    fun setColumns(value: Int) = viewModelScope.launch {
-        preferencesDataSource.setGridLayout(uiState.value.grid.copy(columns = value.coerceIn(1, 12)))
+    /** Sets rows and columns in one write, so neither value is lost to a stale read. */
+    fun setGrid(rows: Int, columns: Int) = viewModelScope.launch {
+        preferencesDataSource.setGridLayout(GridLayout(rows.coerceIn(1, 12), columns.coerceIn(1, 12)))
     }
 
     fun setServerHost(host: String) {
@@ -176,14 +198,38 @@ class SettingsViewModel @Inject constructor(
             pin = uiState.value.serverPinDraft,
         )
         preferencesDataSource.setServerConnection(settings)
+        serverHostDraft.value = null
+        serverPortDraft.value = null
+        serverPinDraft.value = null
         if (connectAfterSave) {
+            message.value = SettingsMessage(SettingsMessageKind.Connecting, settings.host)
             connectionManager.connect(settings)
-            statusMessage.value = "Connection saved. Trying ${settings.websocketUrl}"
         } else {
-            statusMessage.value = "Connection saved"
+            message.value = SettingsMessage(SettingsMessageKind.ConnectionSaved)
         }
     }
 
+    fun disconnect() = viewModelScope.launch {
+        connectionManager.disconnect()
+    }
+
+    /** Looks for StreamPanel servers on the Wi-Fi network the tablet is connected to. */
+    fun scanNetwork() = viewModelScope.launch {
+        if (scanning.value) return@launch
+        scanning.value = true
+        scanFinished.value = false
+        discovered.value = runCatching {
+            lanServerDiscovery.discover(uiState.value.serverPortDraft.toIntOrNull() ?: 17820)
+        }.getOrDefault(emptyList())
+        scanning.value = false
+        scanFinished.value = true
+    }
+
+    /** Tapping a found PC only picks it; the big "Connect" button then uses it together with the PIN. */
+    fun selectDiscovered(server: DiscoveredServer) {
+        serverHostDraft.value = server.host
+        serverPortDraft.value = server.port.toString()
+    }
     fun setKeepScreenOn(enabled: Boolean) = viewModelScope.launch {
         preferencesDataSource.setKeepScreenOn(enabled)
     }
@@ -207,10 +253,10 @@ class SettingsViewModel @Inject constructor(
     fun exportDeck() = viewModelScope.launch {
         val export = repository.exportDeck()
         if (export == null) {
-            statusMessage.value = "Nothing to export"
+            message.value = SettingsMessage(SettingsMessageKind.NothingToExport)
         } else {
             exportJson.value = json.encodeToString(DeckExport.serializer(), export)
-            statusMessage.value = "Deck exported — copy JSON below"
+            message.value = SettingsMessage(SettingsMessageKind.DeckExported)
         }
     }
 
@@ -218,14 +264,18 @@ class SettingsViewModel @Inject constructor(
         runCatching {
             val export = json.decodeFromString(DeckExport.serializer(), raw)
             repository.importDeck(export)
-            statusMessage.value = "Deck imported successfully"
+            message.value = SettingsMessage(SettingsMessageKind.DeckImported)
         }.onFailure {
-            statusMessage.value = "Import failed: ${it.message}"
+            message.value = SettingsMessage(SettingsMessageKind.ImportFailed, it.message)
         }
     }
 
     fun clearExport() {
         exportJson.value = null
+    }
+
+    fun clearMessage() {
+        message.value = null
     }
 
     fun updateQuickLaunchApp(
@@ -372,7 +422,7 @@ class SettingsViewModel @Inject constructor(
     fun exportTimeLogCsv() = viewModelScope.launch {
         val logs = uiState.value.timeLogEntries
         if (logs.isEmpty()) {
-            statusMessage.value = "No time entries yet"
+            message.value = SettingsMessage(SettingsMessageKind.NoTimeEntries)
             return@launch
         }
         val header = "project,started,ended,minutes"
@@ -380,7 +430,7 @@ class SettingsViewModel @Inject constructor(
             "${entry.projectName},${entry.startedAtEpochMs},${entry.endedAtEpochMs},${entry.durationMinutes}"
         }
         exportJson.value = "$header\n$rows"
-        statusMessage.value = "Time log CSV ready — copy below"
+        message.value = SettingsMessage(SettingsMessageKind.TimeCsvReady)
     }
 }
 
@@ -423,5 +473,9 @@ data class SettingsUiState(
     val serverPortDraft: String = ServerConnectionSettings().port.toString(),
     val serverPinDraft: String = "",
     val exportJson: String? = null,
-    val statusMessage: String? = null,
+    val message: SettingsMessage? = null,
+    val connectionStatus: ConnectionStatus = ConnectionStatus.Disconnected,
+    val discoveredServers: List<DiscoveredServer> = emptyList(),
+    val scanning: Boolean = false,
+    val scanFinished: Boolean = false,
 )

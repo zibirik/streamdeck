@@ -1,0 +1,476 @@
+package com.streampanel.feature.settings
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.streampanel.core.designsystem.LocalStreamPanelExtras
+import com.streampanel.core.designsystem.parseHexColor
+
+/** Picks Russian or English for the texts that only the settings screens use. */
+@Immutable
+class Txt(val russian: Boolean) {
+    fun t(ru: String, en: String): String = if (russian) ru else en
+}
+
+val LocalTxt = compositionLocalOf { Txt(russian = true) }
+
+@Composable
+fun tr(ru: String, en: String): String = LocalTxt.current.t(ru, en)
+
+/** Colors for the big pictures: every settings section has its own, so they are easy to tell apart. */
+object SettingsPalette {
+    val Violet = Color(0xFF8B5CF6)
+    val Blue = Color(0xFF3B82F6)
+    val Cyan = Color(0xFF06B6D4)
+    val Green = Color(0xFF22C55E)
+    val Lime = Color(0xFF84CC16)
+    val Amber = Color(0xFFF59E0B)
+    val Orange = Color(0xFFF97316)
+    val Red = Color(0xFFEF4444)
+    val Pink = Color(0xFFEC4899)
+    val Slate = Color(0xFF64748B)
+
+    /** Accent colors offered to the user (hex, because that is how settings store them). */
+    val Accents = listOf(
+        "#8B5CF6", "#6366F1", "#3B82F6", "#06B6D4", "#14B8A6", "#22C55E",
+        "#84CC16", "#F59E0B", "#F97316", "#EF4444", "#EC4899", "#A855F7",
+    )
+}
+
+@Composable
+fun IconBubble(icon: ImageVector, color: Color, modifier: Modifier = Modifier, size: Int = 48) {
+    Box(
+        modifier = modifier
+            .size(size.dp)
+            .clip(RoundedCornerShape((size * 0.32f).dp))
+            .background(Brush.linearGradient(listOf(color, color.copy(alpha = 0.65f)))),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size((size * 0.54f).dp))
+    }
+}
+
+/** The big rounded card every control sits on. Tapping it is optional. */
+@Composable
+fun SoftCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    accent: Color? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val extras = LocalStreamPanelExtras.current
+    val shape = RoundedCornerShape(24.dp)
+    val color = MaterialTheme.colorScheme.surface.copy(alpha = extras.glassAlpha)
+    val border = BorderStroke(1.dp, (accent ?: MaterialTheme.colorScheme.primary).copy(alpha = if (accent != null) 0.45f else 0.14f))
+    val inner: @Composable () -> Unit = {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+    }
+    if (onClick == null) {
+        Surface(modifier = modifier.fillMaxWidth(), shape = shape, color = color, border = border, content = inner)
+    } else {
+        Surface(onClick = onClick, modifier = modifier.fillMaxWidth(), shape = shape, color = color, border = border, content = inner)
+    }
+}
+
+@Composable
+fun PageHeader(title: String, subtitle: String? = null, onBack: (() -> Unit)? = null) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        if (onBack != null) {
+            Surface(
+                onClick = onBack,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.size(52.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = tr("Назад", "Back"),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SectionLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 6.dp, top = 8.dp),
+    )
+}
+
+@Composable
+fun HintText(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier,
+    )
+}
+
+/** One setting, one switch. The whole card is the button, so a thumb can't miss. */
+@Composable
+fun ToggleCard(
+    icon: ImageVector,
+    color: Color,
+    title: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+    subtitle: String? = null,
+) {
+    SoftCard(onClick = { onChange(!checked) }) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            IconBubble(icon, color)
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                if (subtitle != null) {
+                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Switch(checked = checked, onCheckedChange = onChange)
+        }
+    }
+}
+
+@Composable
+fun BigButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    filled: Boolean = true,
+    enabled: Boolean = true,
+    color: Color? = null,
+) {
+    val extras = LocalStreamPanelExtras.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.97f else 1f, label = "button-press")
+    val shape = RoundedCornerShape(20.dp)
+    val background: Brush = when {
+        !filled -> SolidColor(MaterialTheme.colorScheme.surfaceVariant)
+        color != null -> Brush.linearGradient(listOf(color, color.copy(alpha = 0.78f)))
+        else -> extras.accentGradient
+    }
+    val contentColor = if (filled) Color.White else MaterialTheme.colorScheme.onSurface
+    Box(
+        modifier = modifier
+            .heightIn(min = 58.dp)
+            .scale(scale)
+            .alpha(if (enabled) 1f else 0.4f)
+            .clip(shape)
+            .background(background)
+            .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (icon != null) Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(24.dp))
+            Text(text, color = contentColor, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** A round "pill" you tap to pick one thing out of a few. */
+@Composable
+fun ChoicePill(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val primary = MaterialTheme.colorScheme.primary
+    val background by animateColorAsState(
+        if (selected) primary.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant,
+        label = "pill-bg",
+    )
+    Row(
+        modifier = modifier
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .background(background)
+            .border(2.dp, if (selected) primary else Color.Transparent, RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+    ) {
+        if (selected) Icon(Icons.Rounded.Check, contentDescription = null, tint = primary, modifier = Modifier.size(20.dp))
+        Text(
+            text,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) primary else MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ColorDots(selected: String, colors: List<String>, onPick: (String) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        colors.forEach { hex ->
+            val color = parseHexColor(hex, Color.Gray)
+            val isSelected = hex.equals(selected, ignoreCase = true)
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(color)
+                    .border(if (isSelected) 4.dp else 0.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                    .clickable { onPick(hex) },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isSelected) Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
+            }
+        }
+    }
+}
+
+/** Minus, a big number, plus. */
+@Composable
+fun Stepper(label: String, value: Int, range: IntRange, onChange: (Int) -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(label, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            RoundStepButton("−", enabled = value > range.first) { onChange(value - 1) }
+            Text(
+                "$value",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.width(44.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            RoundStepButton("+", enabled = value < range.last) { onChange(value + 1) }
+        }
+    }
+}
+
+@Composable
+private fun RoundStepButton(symbol: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(52.dp)
+            .alpha(if (enabled) 1f else 0.35f)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(symbol, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+@Composable
+fun BigField(
+    value: String,
+    onChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    leading: ImageVector? = null,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    singleLine: Boolean = true,
+    secret: Boolean = false,
+) {
+    var visible by rememberSaveable { mutableStateOf(false) }
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label) },
+        placeholder = placeholder?.let { { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)) } },
+        leadingIcon = leading?.let { { Icon(it, contentDescription = null) } },
+        trailingIcon = if (secret) {
+            {
+                Icon(
+                    if (visible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                    contentDescription = tr("Показать или скрыть", "Show or hide"),
+                    modifier = Modifier.clip(CircleShape).clickable { visible = !visible }.padding(4.dp),
+                )
+            }
+        } else null,
+        visualTransformation = if (secret && !visible) PasswordVisualTransformation() else VisualTransformation.None,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        singleLine = singleLine,
+        shape = RoundedCornerShape(18.dp),
+        textStyle = MaterialTheme.typography.titleMedium,
+        modifier = modifier.fillMaxWidth(),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+            cursorColor = MaterialTheme.colorScheme.primary,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+            focusedLabelColor = MaterialTheme.colorScheme.primary,
+            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
+            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            focusedTrailingIconColor = MaterialTheme.colorScheme.primary,
+            unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
+    )
+}
+
+/** Hides the rarely needed things so the page stays calm. */
+@Composable
+fun MoreOptions(title: String, content: @Composable ColumnScope.() -> Unit) {
+    var open by rememberSaveable(title) { mutableStateOf(false) }
+    val turn by animateFloatAsState(if (open) 180f else 0f, label = "more-arrow")
+    SoftCard {
+        Row(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { open = !open },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            Icon(Icons.Rounded.ExpandMore, contentDescription = null, modifier = Modifier.rotate(turn), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        AnimatedVisibility(open, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+        }
+    }
+}
+
+/** A pulsing dot: green, amber or red tells the whole story at a glance. */
+@Composable
+fun StatusDot(color: Color, pulsing: Boolean, size: Int = 14) {
+    val transition = rememberInfiniteTransition(label = "dot")
+    val ring by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (pulsing) 2.2f else 1f,
+        animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Restart),
+        label = "dot-ring",
+    )
+    Box(Modifier.size((size * 2.2f).dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .size((size * ring).dp)
+                .clip(CircleShape)
+                .background(color.copy(alpha = if (pulsing) (2.2f - ring) / 2.2f * 0.5f else 0f)),
+        )
+        Box(Modifier.size(size.dp).clip(CircleShape).background(color))
+    }
+}
+
+/** A small message at the bottom: "Saved!" and similar. */
+@Composable
+fun MessagePill(text: String?, modifier: Modifier = Modifier) {
+    AnimatedVisibility(
+        visible = text != null,
+        modifier = modifier,
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically(),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = MaterialTheme.colorScheme.inverseSurface,
+            shadowElevation = 12.dp,
+        ) {
+            Text(
+                text.orEmpty(),
+                color = MaterialTheme.colorScheme.inverseOnSurface,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp),
+            )
+        }
+    }
+}
+
+@Composable
+fun VSpace(height: Int = 8) = Spacer(Modifier.height(height.dp))

@@ -5,6 +5,15 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Settings redesigned from scratch: a home screen of big colorful tiles, one simple page per topic,
+  live connection status, "Find my PC" auto-discovery, theme previews, color swatches instead of hex codes,
+  grid preview, one-tap backup/restore and an About page. Settings texts are fully localized (RU/EN).
+- Text fields now follow the theme colors (they were always white, unreadable on the Light theme).
+
+### Fixed
+- Choosing a grid preset (e.g. 4×4) could keep the old row count because rows and columns were saved separately.
+
 ### Security
 - PIN authentication is now enforced per WebSocket connection and for the HTTP API
   (`/status`, `/api/configurator/*`, `/integrations/*`); wrong PINs are rate-limited per IP.
